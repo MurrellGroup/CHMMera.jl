@@ -106,10 +106,10 @@ function viterbi(O::Vector{Int64}, hmm::ApproximateHMM)
         end
     end
     cur = argmax(phi)
-    recombinations = NamedTuple{(:position, :at, :to), Int64, Int64, Int64}[]
+    recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
     for t in hmm.L:-1:1
         if cur != from[cur, t]
-            push!(recombinations, (t-1, from[cur, t], cur))
+            push!(recombinations, (position=t-1, at=from[cur, t], to=cur))
             cur = from[cur, t]
         end
     end
@@ -191,10 +191,10 @@ function viterbi(O::Vector{Int64}, hmm::FullHMM)
         end
     end
     cur = argmax(phi)
-    recombinations = NamedTuple{(:position, :at, :to), Int64, Int64, Int64}[]
+    recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
     for t in hmm.L:-1:1
         if cur != from[cur, t]
-            push!(recombinations, (t-1, seq_idx(from[cur, t]), seq_idx(cur)))
+            push!(recombinations, (position=t-1, at=seq_idx(from[cur, t]), to=seq_idx(cur)))
             cur = from[cur, t]
         end
     end
