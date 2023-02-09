@@ -95,25 +95,25 @@ function viterbi(O::Vector{Int64}, hmm::ApproximateHMM)
     for t in 1:hmm.L-1
         max1, max2 = maxtwo(phi)
         for j in 1:hmm.N
-            switch_idx, switch_val = max1[1] != j ? max1 : max2
-            if phi[j] + loga[1, j] > switch_val + loga[2, j]
+            recomb_idx, recomb_val = max1[1] != j ? max1 : max2
+            if phi[j] + loga[1, j] > recomb_val + loga[2, j]
                 from[j, t+1] = j
                 phi[j] = phi[j] + loga[1, j] + logb[j, t+1]
             else
-                from[j, t+1] = switch_idx
-                phi[j] = switch_val + loga[2, j] + logb[j, t+1]
+                from[j, t+1] = recomb_idx
+                phi[j] = recomb_val + loga[2, j] + logb[j, t+1]
             end
         end
     end
     cur = argmax(phi)
-    switches = Tuple{Int64, Int64, Int64}[]
+    recombinations = NamedTuple{(:position, at, to), Int64, Int64, Int64}[]
     for t in hmm.L:-1:1
         if cur != from[cur, t]
-            push!(switches, (t-1, from[cur, t], cur))
+            push!(recombinations, (t-1, from[cur, t], cur))
             cur = from[cur, t]
         end
     end
-    return switches
+    return recombinations
 end
 
 function chimeraprobability(O::Vector{Int64}, hmm::ApproximateHMM)
@@ -121,7 +121,7 @@ function chimeraprobability(O::Vector{Int64}, hmm::ApproximateHMM)
     return forward(O, hmm)
 end
 
-function findpath(O::Vector{Int64}, hmm::ApproximateHMM)
+function findrecombinations(O::Vector{Int64}, hmm::ApproximateHMM)
     parameterestimation!(O, hmm)
     return viterbi(O, hmm)
 end
@@ -129,12 +129,13 @@ end
 #Full Bayes version
 
 function forward(O::Vector{Int64}, hmm::FullHMM)
+    state(m, seq_idx) = (seq_idx-1)*hmm.K + m
+    seq_idx(i) = div(i-1, hmm.K) + 1
     alfa = Matrix{Float64}(undef, 2, hmm.N)
-    i = 1
     for m in 1:hmm.K, seq_idx in 1:hmm.n
+        i = state(m, seq_idx)
         alfa[1, i] = initialstate(hmm) * b(seq_idx, m, 1, O, hmm)
         alfa[2, i] = 0.0
-        i += 1
     end
     c = Vector{Float64}(undef, hmm.L)
     c[1] = 1
@@ -144,12 +145,11 @@ function forward(O::Vector{Int64}, hmm::FullHMM)
             sumalfa += alfa[x, i]
         end
         newsumalfa = 0.0
-        j = 1
         for m in 1:hmm.K, seq_idx in 1:hmm.n
+            j = state(m, seq_idx)
             alfa[2, j] = ((sumalfa - sum(alfa[:, j]))*a(false, hmm) + alfa[2, j]*a(true, hmm)) * b(seq_idx, m, t+1, O, hmm)
             alfa[1, j] = alfa[1, j] * a(true, hmm) * b(seq_idx, m, t+1, O, hmm)
             newsumalfa += alfa[j]
-            j += 1
         end
         c[t+1] = 1/newsumalfa
         alfa .*= c[t+1]
@@ -160,12 +160,12 @@ function forward(O::Vector{Int64}, hmm::FullHMM)
 end
 
 function viterbi(O::Vector{Int64}, hmm::FullHMM)
-    loga = Array{Float64}(undef, 2, hmm.n * hmm.K)
-    logb = Array{Float64}(undef, hmm.n * hmm.K, hmm.L)
-    loga[1, :] .= log(a(true, hmm))
-    loga[2, :] .= log(a(false, hmm))
     state(m, seq_idx) = (seq_idx-1)*hmm.K + m
     seq_idx(i) = div(i-1, hmm.K) + 1
+    loga = Array{Float64}(undef, 2, hmm.N)
+    logb = Array{Float64}(undef, hmm.N, hmm.L)
+    loga[1, :] .= log(a(true, hmm))
+    loga[2, :] .= log(a(false, hmm))
     for t in 1:hmm.L, m in 1:hmm.K, seq_idx in 1:hmm.n
         logb[state(m, seq_idx), t] = log(b(seq_idx, m, t, O, hmm))
     end
@@ -180,27 +180,27 @@ function viterbi(O::Vector{Int64}, hmm::FullHMM)
         max1, max2 = maxtwo(phi)
         for m in 1:hmm.K, seq_idx in 1:hmm.n
             j = state(m, seq_idx)
-            switch_idx, switch_val = max1[1] != j ? max1 : max2
-            if phi[j] + loga[1, j] > switch_val + loga[2, j]
+            recomb_idx, recomb_val = max1[1] != j ? max1 : max2
+            if phi[j] + loga[1, j] > recomb_val + loga[2, j]
                 from[j, t+1] = j
                 phi[j] = phi[j] + loga[1, j] + logb[j, t+1]
             else
-                from[j, t+1] = switch_idx
-                phi[j] = switch_val + loga[2, j] + logb[j, t+1]
+                from[j, t+1] = recomb_idx
+                phi[j] = recomb_val + loga[2, j] + logb[j, t+1]
             end
         end
     end
     cur = argmax(phi)
-    switches = Tuple{Int64, Int64, Int64}[]
+    recombinations = NamedTuple{(:position, at, to), Int64, Int64, Int64}[]
     for t in hmm.L:-1:1
         if cur != from[cur, t]
-            push!(switches, (t-1, seq_idx(from[cur, t]), seq_idx(cur)))
+            push!(recombinations, (t-1, seq_idx(from[cur, t]), seq_idx(cur)))
             cur = from[cur, t]
         end
     end
-    return switches
+    return recombinations
 end
 
 chimeraprobability(O::Vector{Int64}, hmm::FullHMM) = forward(O, hmm)
 
-findpath(O::Vector{Int64}, hmm::FullHMM) = viterbi(O, hmm)
+findrecombinations(O::Vector{Int64}, hmm::FullHMM) = viterbi(O, hmm)

@@ -47,7 +47,7 @@ function b(i::Int64, t::Int64, O::Vector{Int64}, hmm::ApproximateHMM)
     if O[t] == 6
         return 1.0
     else
-        #BM: Changed denom to 5 to avoid "chaeating" with gaps.
+        #BM: Changed denom to 5 to avoid "cheating" with gaps.
         #We might want to have a separate "indel" rate though.
         return O[t] == hmm.S[i, t] ? 1-hmm.pmut[i] : hmm.pmut[i]/5 
     end

@@ -35,15 +35,26 @@ function get_chimeraprobabilities(queries::Vector{Vector{Int64}}, references::Ve
     return Float64[chimeraprobability(q, newhmm(references)) for q in queries]
 end
 
+
+"""
+    get_chimeraprobabilities(queries::Vector{String}, references::Vector{String}; fast::Bool = true, prior_probability::Float64 = 1/300)
+
+Get the probability of a sequence being chimeric for each query sequence given a list of reference sequences. `fast` is a boolean indicating whether to use the approximate HMM or the full HMM. `prior_probability` is the prior probability of a sequence being chimeric.
+"""
 get_chimeraprobabilities(queries::Vector{String}, references::Vector{String}; fast::Bool = true, prior_probability::Float64 = 1/300) = get_chimeraprobabilities(as_ints.(queries), as_ints.(references); fast = fast, prior_probability = prior_probability)
 
-function get_path(query::Vector{Int64}, references::Vector{Vector{Int64}}; fast::Bool = true, prior_probability::Float64 = 1/300)
+function get_recombination_events(query::Vector{Int64}, references::Vector{Vector{Int64}}; fast::Bool = true, prior_probability::Float64 = 1/300)
     if fast
         hmm = ApproximateHMM(vovtomatrix(references), 0.05, prior_probability)
     else
         hmm = FullHMM(vovtomatrix(references), [0.02, 0.04, 0.07, 0.11, 0.15], prior_probability)
     end
-    return findpath(query, hmm)
+    return findrecombinations(query, hmm)
 end
 
-get_path(query::String, references::Vector{String}; fast = true, prior_probability = 1/300) = get_path(as_ints(query), as_ints.(references), fast = fast, prior_probability = prior_probability)
+"""
+    get_recombination_events(query::String, references::Vector{String}; fast = true, prior_probability = 1/300)
+
+Get the recombination events for a query sequence given a set of reference sequences. The return type is `Vector{NamedTuple{(:position, at, to), Int64, Int64, Int64}}`. Each tuple represents a recombination event and is of the form `(position:, at:, next:)`, where `at` and `next` are indices of the references and position is the site of the recombination event. `fast` is a boolean indicating whether to use the approximate HMM or the full HMM. `prior_probability` is the prior probability of a sequence being chimeric.
+"""
+get_recombination_events(query::String, references::Vector{String}; fast = true, prior_probability = 1/300) = get_recombination_events(as_ints(query), as_ints.(references), fast = fast, prior_probability = prior_probability)
