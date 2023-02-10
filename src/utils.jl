@@ -67,7 +67,7 @@ function get_site_probabilities(query::String, references::Vector{String}; prior
     recombs = get_recombination_events(query, references, fast=true) # defaults to fast=true
     @assert length(recombs) > 0 "No recombinations found, can only be run on chimeric sequences"
     O = as_ints(query)
-    hmm = ApproximateHMM(vovtomatrix(as_ints(references)), 0.05, prior_probability)
+    hmm = ApproximateHMM(vovtomatrix(as_ints.(references)), 0.05, prior_probability)
     parameterestimation!(hmm, O)
     return siteprobabilities(recombs, O, hmm)
 end
