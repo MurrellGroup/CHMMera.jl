@@ -2,7 +2,7 @@ module CHMMera
 
 # Write your package code here.
 
-export get_chimeraprobabilities, get_recombination_events
+export get_chimeraprobabilities, get_recombination_events, get_site_probabilities
 
 include("utils.jl")
 include("hmm.jl")
