@@ -69,5 +69,5 @@ function get_log_site_probabilities(query::String, references::Vector{String}; p
     O = as_ints(query)
     hmm = ApproximateHMM(vovtomatrix(as_ints.(references)), 0.05, prior_probability)
     parameterestimation!(O, hmm)
-    return sitelogprobabilities(recombs, O, hmm)
+    return logsiteprobabilities(recombs, O, hmm)
 end
