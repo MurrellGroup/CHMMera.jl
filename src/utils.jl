@@ -28,7 +28,7 @@ function vovtomatrix(vov)
 end
 
 # API
-function get_chimeraprobabilities(queries::Vector{Vector{Int64}}, references::Vector{Vector{Int64}}; fast::Bool = true, prior_probability::Float64 = 1/300)
+function get_chimera_probabilities(queries::Vector{Vector{Int64}}, references::Vector{Vector{Int64}}; fast::Bool = true, prior_probability::Float64 = 1/300)
     mcat = [0.02, 0.04, 0.07, 0.11, 0.15]
     basem = 0.05
     newhmm(refs::Vector{Vector{Int64}}) = fast ? ApproximateHMM(vovtomatrix(refs), basem, prior_probability) : FullHMM(vovtomatrix(refs), mcat, prior_probability)
@@ -37,11 +37,11 @@ end
 
 
 """
-    get_chimeraprobabilities(queries::Vector{String}, references::Vector{String}; fast::Bool = true, prior_probability::Float64 = 1/300)
+    get_chimera_probabilities(queries::Vector{String}, references::Vector{String}; fast::Bool = true, prior_probability::Float64 = 1/300)
 
 Get the probability of a sequence being chimeric for each query sequence given a list of reference sequences. `fast` is a boolean indicating whether to use the approximate HMM or the full HMM. `prior_probability` is the prior probability of a sequence being chimeric.
 """
-get_chimeraprobabilities(queries::Vector{String}, references::Vector{String}; fast::Bool = true, prior_probability::Float64 = 1/300) = get_chimeraprobabilities(as_ints.(queries), as_ints.(references); fast = fast, prior_probability = prior_probability)
+get_chimera_probabilities(queries::Vector{String}, references::Vector{String}; fast::Bool = true, prior_probability::Float64 = 1/300) = get_chimera_probabilities(as_ints.(queries), as_ints.(references); fast = fast, prior_probability = prior_probability)
 
 function get_recombination_events(query::Vector{Int64}, references::Vector{Vector{Int64}}; fast::Bool = true, prior_probability::Float64 = 1/300)
     if fast
