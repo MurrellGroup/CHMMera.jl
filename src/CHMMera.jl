@@ -6,6 +6,6 @@ export get_chimeraprobabilities, get_recombination_events
 
 include("utils.jl")
 include("hmm.jl")
-include("algs.jl")
+include("algorithms.jl")
 
 end

@@ -17,7 +17,6 @@ function as_ints(seq::String)
     return Int64[findfirst(mymap.==uppercase(nt)) for nt in seq]
 end
 
-# API
 function vovtomatrix(vov)
     n = length(vov)
     L = minimum(length.(vov))
@@ -28,6 +27,7 @@ function vovtomatrix(vov)
     return mat
 end
 
+# API
 function get_chimeraprobabilities(queries::Vector{Vector{Int64}}, references::Vector{Vector{Int64}}; fast::Bool = true, prior_probability::Float64 = 1/300)
     mcat = [0.02, 0.04, 0.07, 0.11, 0.15]
     basem = 0.05
@@ -58,3 +58,15 @@ end
 Get the recombination events for a query sequence given a set of reference sequences. The return type is `Vector{NamedTuple{(:position, :at, :to), Int64, Int64, Int64}}`. Each tuple represents a recombination event and is of the form `(position, at, next)`, where `at` and `next` are indices of the references, whilst position is the site of the recombination event. `fast` is a boolean indicating whether to use the approximate HMM or the full HMM. `prior_probability` is the prior probability of a sequence being chimeric.
 """
 get_recombination_events(query::String, references::Vector{String}; fast = true, prior_probability = 1/300) = get_recombination_events(as_ints(query), as_ints.(references), fast = fast, prior_probability = prior_probability)
+
+"""
+    path_scores(recombs::Vector{NamedTuple{(:position, :at, :to), Int64, Int64, Int64}}, query::Vector{Int64}, hmm::HMM)
+Find the probability for each site (i.e., forward[t] * backward[t] for each t) in the path given by the viterbi algorithm.
+"""
+function site_probabilities(query::String, refs::Vector{String}; prior_probability = 1/300)
+    recombs = get_recombination_events(query, refs, fast=true) # defaults to fast=true
+    O = as_ints(query)
+    hmm = ApproximateHMM(vovtomatrix(as_ints(references)), 0.05, 1/300)
+    parameterestimation!(hmm, O)
+    return site_probabilities(recombs, O, hmm)
+end
