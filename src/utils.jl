@@ -68,6 +68,6 @@ function get_site_probabilities(query::String, references::Vector{String}; prior
     @assert length(recombs) > 0 "No recombinations found, can only be run on chimeric sequences"
     O = as_ints(query)
     hmm = ApproximateHMM(vovtomatrix(as_ints.(references)), 0.05, prior_probability)
-    parameterestimation!(hmm, O)
+    parameterestimation!(O, hmm)
     return siteprobabilities(recombs, O, hmm)
 end
