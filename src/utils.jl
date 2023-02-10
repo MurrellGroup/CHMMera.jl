@@ -69,5 +69,5 @@ function get_site_probabilities(query::String, refs::Vector{String}; prior_proba
     O = as_ints(query)
     hmm = ApproximateHMM(vovtomatrix(as_ints(references)), 0.05, 1/300)
     parameterestimation!(hmm, O)
-    return site_probabilities(recombs, O, hmm)
+    return siteprobabilities(recombs, O, hmm)
 end

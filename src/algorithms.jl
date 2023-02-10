@@ -127,7 +127,7 @@ function findrecombinations(O::Vector{Int64}, hmm::ApproximateHMM)
     return viterbi(O, hmm)
 end
 
-function site_probabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::ApproximateHMM)
+function siteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::ApproximateHMM)
     alfa = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
