@@ -127,23 +127,23 @@ function findrecombinations(O::Vector{Int64}, hmm::ApproximateHMM)
     return viterbi(O, hmm)
 end
 
-function siteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::ApproximateHMM)
+function sitelogprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::ApproximateHMM)
     alfa = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
     forward!(alfa, c, O, hmm)
     backward!(beta, c, O, hmm)
     sort!(recombs, by = x -> x.position)
-    scores = Float64[]
+    log_probability = Array{Float64}(undef, hmm.L)
     i = 1
     for t in 1:hmm.L
         cur = recombs[i].at
-        scores[t] = alfa[cur, t] * beta[cur, t]
+        log_probability[t] = log(alfa[cur, t]) + log(beta[cur, t]) - log(c[t])
         if t < hmm.L && recombs[i].position == t
             i += 1
         end
     end
-    return scores
+    return log_probability
 end
 
 #Full Bayes version
