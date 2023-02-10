@@ -60,10 +60,10 @@ Get the recombination events for a query sequence given a set of reference seque
 get_recombination_events(query::String, references::Vector{String}; fast = true, prior_probability = 1/300) = get_recombination_events(as_ints(query), as_ints.(references), fast = fast, prior_probability = prior_probability)
 
 """
-    path_scores(recombs::Vector{NamedTuple{(:position, :at, :to), Int64, Int64, Int64}}, query::Vector{Int64}, hmm::HMM)
-Find the probability for each site (i.e., forward[t] * backward[t] for each t) in the path given by the viterbi algorithm.
+    get_log_site_probabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Int64, Int64, Int64}}, query::Vector{Int64}, hmm::HMM)
+Find the probability for each site (i.e., forward[t] * backward[t] for each t) in the path given by the viterbi algorithm. Can only be run with chimeric sequences.
 """
-function get_site_log_probabilities(query::String, references::Vector{String}; prior_probability = 1/300)
+function get_log_site_probabilities(query::String, references::Vector{String}; prior_probability = 1/300)
     recombs = get_recombination_events(query, references, fast=true) # defaults to fast=true
     @assert length(recombs) > 0 "No recombinations found, can only be run on chimeric sequences"
     O = as_ints(query)
