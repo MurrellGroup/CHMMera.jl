@@ -136,10 +136,11 @@ function sitelogprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), 
     sort!(recombs, by = x -> x.position)
     log_probability = Array{Float64}(undef, hmm.L)
     i = 1
+    cur = recombs[i].at
     for t in 1:hmm.L
-        cur = recombs[i].at
         log_probability[t] = log(alfa[cur, t]) + log(beta[cur, t]) - log(c[t])
         if t < hmm.L && recombs[i].position == t
+            cur = recombs[i].to
             i += 1
         end
     end
