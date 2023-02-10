@@ -63,8 +63,8 @@ get_recombination_events(query::String, references::Vector{String}; fast = true,
     path_scores(recombs::Vector{NamedTuple{(:position, :at, :to), Int64, Int64, Int64}}, query::Vector{Int64}, hmm::HMM)
 Find the probability for each site (i.e., forward[t] * backward[t] for each t) in the path given by the viterbi algorithm.
 """
-function get_site_probabilities(query::String, refs::Vector{String}; prior_probability = 1/300)
-    recombs = get_recombination_events(query, refs, fast=true) # defaults to fast=true
+function get_site_probabilities(query::String, references::Vector{String}; prior_probability = 1/300)
+    recombs = get_recombination_events(query, references, fast=true) # defaults to fast=true
     @assert length(recombs) > 0 "No recombinations found, can only be run on chimeric sequences"
     O = as_ints(query)
     hmm = ApproximateHMM(vovtomatrix(as_ints(references)), 0.05, prior_probability)
