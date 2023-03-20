@@ -15,7 +15,7 @@ function ApproximateHMM(references::Matrix{Int64}, base_mutation_probability::Fl
     L = length(references[1, :])
     S = references
     mutation_probabilities = [base_mutation_probability for i in 1:N]
-    switch_probability = pchimera_prior / L
+    switch_probability = chimera_prior_probability / L
     return ApproximateHMM(N, L, S, mutation_probabilities, switch_probability)
 end
 
