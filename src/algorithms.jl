@@ -220,9 +220,11 @@ function viterbi(O::Vector{Int64}, hmm::FullHMM)
         end
     end
     reverse(recombinations)
-    return recombinations
+    return (recombinations = recombinations, startingpoint = seq_idx(cur))
 end
 
 chimeraprobability(O::Vector{Int64}, hmm::FullHMM) = forward(O, hmm)
 
-findrecombinations(O::Vector{Int64}, hmm::FullHMM) = viterbi(O, hmm)
+findrecombinations(O::Vector{Int64}, hmm::FullHMM) = viterbi(O, hmm)[1]
+
+findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::FullHMM) = viterbi(O, hmm)

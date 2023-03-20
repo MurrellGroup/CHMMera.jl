@@ -12,15 +12,14 @@ Get the probability of a sequence being chimeric for each query sequence given a
 get_chimera_probabilities(queries::Vector{String}, references::Vector{String}; fast::Bool = true, mutation_probabilities = [0.02, 0.04, 0.07, 0.11, 0.15], base_mutation_probability = 0.05, prior_probability::Float64 = 1/300) = 
     get_chimera_probabilities(as_ints.(queries), as_ints.(references); fast = fast, mutation_probabilities = mutation_probabilities, base_mutation_probability = base_mutation_probability, prior_probability = prior_probability)
 
-function get_recombination_events(query::Vector{Int64}, references::Vector{Vector{Int64}}; fast::Bool = true, mutation_probabilities = [0.02, 0.04, 0.07, 0.11, 0.15], base_mutation_probability = 0.05, prior_probability::Float64 = 1/300)
+function get_recombination_events(query::Vector{Int64}, references::Vector{Vector{Int64}}; fast::Bool = true, mutation_probabilities = [0.02, 0.04, 0.07, 0.11, 0.15], base_mutation_probability = 0.05, prior_probability::Float64 = 1/300, startingpoint = false)
     if fast
         hmm = ApproximateHMM(vovtomatrix(references), base_mutation_probability, prior_probability)
     else
         hmm = FullHMM(vovtomatrix(references), mutation_probabilities, prior_probability)
     end
-    return findrecombinations(query, hmm)
+    return startingpoint ? findrecombinations(query, hmm) : findrecombinations_and_startingpoint(query, hmm)
 end
-
 
 """
     get_recombination_events(query::String, references::Vector{String}; fast = true, prior_probability = 1/300)
