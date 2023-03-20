@@ -74,7 +74,7 @@ function parameterestimation!(O::Vector{Int64}, hmm::ApproximateHMM)
                 end
             end
         end
-        hmm.pmut[i] = (Nmut) / ((Nmut + Nsame))
+        hmm.mutation_probabilities[i] = (Nmut) / ((Nmut + Nsame))
     end
 end
 
