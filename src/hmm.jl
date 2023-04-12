@@ -39,24 +39,24 @@ function FullHMM(references::Matrix{Int64}, mutation_probabilities::Vector{Float
     return FullHMM(N, n, L, K, S, mutation_probabilities, switch_probability)
 end
 
+ref_index(state_index, hmm::FullHMM) = div(state_index-1, hmm.K) + 1
+ref_index(state_index, hmm::ApproximateHMM) = state_index
+
+# mod(state_index, hmm.K) + 1 is correct but rewraps weird, (2, 3, ..., K, 1) instead of (1, 2, 3, ..., K), but it's slightly faster and less code than using an explicit rewrapping function.
+mutationrate_index(state_index, hmm::FullHMM) = mod(state_index, hmm.K) + 1 
+mutationrate_index(state_index, hmm::ApproximateHMM) = state_index
+
+
 initialstate(hmm::HMM) = 1 / hmm.N
 
 a(samestate::Bool, hmm::HMM) = samestate ? 1 - hmm.switch_probability : hmm.switch_probability / (hmm.N - 1)
 
-function b(i::Int64, t::Int64, O::Vector{Int64}, hmm::ApproximateHMM)
+function b(i, t, O, hmm::HMM)
     if O[t] == 6
         return 1.0
     else
         #BM: Changed denom to 5 to avoid "cheating" with gaps.
         #We might want to have a separate "indel" rate though.
-        return O[t] == hmm.S[i, t] ? 1-hmm.mutation_probabilities[i] : hmm.mutation_probabilities[i]/5 
-    end
-end
-
-function b(i::Int64, m::Int64, t::Int64, O::Vector{Int64}, hmm::FullHMM)
-    if O[t] == 6
-        return 1.0
-    else
-        return O[t] == hmm.S[i, t] ? 1-hmm.mutation_probabilities[m] : hmm.mutation_probabilities[m]/5
+        return O[t] == hmm.S[ref_index(i, hmm), t] ? 1 - hmm.mutation_probabilities[mutationrate_index(i, hmm)] : hmm.mutation_probabilities[mutationrate_index(i, hmm)] / 5
     end
 end

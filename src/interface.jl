@@ -18,7 +18,7 @@ function get_recombination_events(query::Vector{Int64}, references::Vector{Vecto
     else
         hmm = FullHMM(vovtomatrix(references), mutation_probabilities, prior_probability)
     end
-    return startingpoint ? findrecombinations(query, hmm) : findrecombinations_and_startingpoint(query, hmm)
+    return startingpoint ? findrecombinations_and_startingpoint(query, hmm) : findrecombinations(query, hmm)
 end
 
 """
