@@ -147,7 +147,7 @@ function findrecombinations(O::Vector{Int64}, hmm::T) where T <: HMM
     return viterbi(O, hmm)[1]
 end
 
-function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::FullHMM)
+function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::FullHMM) where T <: HMM
     T == ApproximateHMM && parameterestimation!(O, hmm)
     return viterbi(O, hmm)
 end
