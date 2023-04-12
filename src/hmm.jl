@@ -59,8 +59,4 @@ function b(i, t, O, hmm::HMM)
         #We might want to have a separate "indel" rate though.
         return O[t] == hmm.S[ref_index(i, hmm), t] ? 1 - hmm.mutation_probabilities[mutationrate_index(i, hmm)] : hmm.mutation_probabilities[mutationrate_index(i, hmm)] / 5
     end
-<<<<<<< HEAD
 end
-=======
-end
->>>>>>> refs/remotes/origin/main
