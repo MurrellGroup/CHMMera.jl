@@ -1,48 +1,48 @@
 #Approx Bayes version
 
-function forward(O::Vector{Int64}, hmm::ApproximateHMM)
-    alfa = Array{Float64}(undef, 2, hmm.N)
-    c = Vector{Float64}(undef, hmm.L)
-    c[1] = 1
+# alpha[t, i] = probability of ending up at Sᵢ after having observed observations up to t-1
+
+function forward(O::Vector{Int64}, hmm::HMM)
+    alpha = Matrix{Float64}(undef, 2, hmm.N)
     for i in 1:hmm.N
-        alfa[1, i] = initialstate(hmm) * b(i, 1, O, hmm)
-        alfa[2, i] = 0.0
+        alpha[1, i] = initialstate(hmm) * b(i, 1, O, hmm)
+        alpha[2, i] = 0.0
     end
     for t in 1:hmm.L-1
-        sum_alfa = sum(alfa)
+        sum_alpha = sum(alpha)
         for j in 1:hmm.N
-            alfa[2, j] = ((sum_alfa - sum(alfa[:, j])) * a(false, hmm) + alfa[2, j] * a(true, hmm)) * b(j, t+1, O, hmm)
-            alfa[1, j] = alfa[1, j] * a(true, hmm) * b(j, t+1, O, hmm)
+            alpha[2, j] = ((sum_alpha - sum(alpha[:, j])) * a(false, hmm) + alpha[2, j] * a(true, hmm)) * b(j, t+1, O, hmm)
+            alpha[1, j] = alpha[1, j] * a(true, hmm) * b(j, t+1, O, hmm)
         end
-        c[t+1] = 1/sum(alfa)
-        alfa .*= c[t+1]
+        scaling_constant = 1/sum(alpha)
+        alpha .*= scaling_constant
     end
     
-    detec = sum(alfa[2, :])
-    return detec / (sum(alfa[1, :]) + detec)   #sum(alfa[2, :]) / sum(alfa)
+    detec = sum(alpha[2, :])
+    return detec / (sum(alpha[1, :]) + detec)   #sum(alpha[2, :]) / sum(alpha)
 end
 
-function forward!(alfa::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::ApproximateHMM)
+function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::HMM)
     c[1] = 1
     for i in 1:hmm.N
-        alfa[i, 1] = initialstate(hmm) * b(i, 1, O, hmm)
+        alpha[i, 1] = initialstate(hmm) * b(i, 1, O, hmm)
     end
     for t in 1:hmm.L-1
-        sumalfa = 0.0
-        for x in alfa[:, t]
-            sumalfa += x
+        sumalpha = 0.0
+        for x in alpha[:, t]
+            sumalpha += x
         end
-        newsumalfa = 0.0
+        newsumalpha = 0.0
         for j in 1:hmm.N
-            alfa[j, t+1] = ((sumalfa-alfa[j, t])*a(false, hmm) + alfa[j, t]*a(true, hmm)) * b(j, t+1, O, hmm)
-            newsumalfa += alfa[j, t+1]
+            alpha[j, t+1] = ((sumalpha-alpha[j, t])*a(false, hmm) + alpha[j, t]*a(true, hmm)) * b(j, t+1, O, hmm)
+            newsumalpha += alpha[j, t+1]
         end
-        c[t+1] = 1/newsumalfa
-        alfa[:,t+1] .*= c[t+1]
+        c[t+1] = 1/newsumalpha
+        alpha[:,t+1] .*= c[t+1]
     end
 end
 
-function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::ApproximateHMM)
+function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::HMM)
     beta[:, hmm.L] .= c[hmm.L]
     for t in hmm.L-1:-1:1
         sumbeta = 0.0
@@ -56,29 +56,7 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, 
     end
 end
 
-function parameterestimation!(O::Vector{Int64}, hmm::ApproximateHMM)
-    alfa = Array{Float64}(undef, hmm.N, hmm.L)
-    beta = Array{Float64}(undef, hmm.N, hmm.L)
-    c = Array{Float64}(undef, hmm.L)
-    forward!(alfa, c, O, hmm)
-    backward!(beta, c, O, hmm)
-    for i in 1:hmm.N
-        Nmut = 2.0 #pseudocount "prior"?
-        Nsame = 10.0 #pseudocount "prior"?
-        for t in 1:hmm.L
-            if O[t] != 6 #BM change, to handle non-informative obs
-                if O[t] != hmm.S[i, t]
-                    Nmut += (alfa[i, t]*beta[i, t]/c[t])
-                else
-                    Nsame += (alfa[i, t]*beta[i, t]/c[t])
-                end
-            end
-        end
-        hmm.mutation_probabilities[i] = (Nmut) / ((Nmut + Nsame))
-    end
-end
-
-function viterbi(O::Vector{Int64}, hmm::ApproximateHMM)
+function viterbi(O::Vector{Int64}, hmm::HMM)
     loga = Array{Float64}(undef, 2, hmm.N)
     logb = Array{Float64}(undef, hmm.N, hmm.L)
     loga[1, :] .= log(a(true, hmm))
@@ -108,37 +86,49 @@ function viterbi(O::Vector{Int64}, hmm::ApproximateHMM)
     cur = argmax(phi)
     recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
     for t in hmm.L:-1:1
-        if cur != from[cur, t]
-            push!(recombinations, (position=t-1, at=from[cur, t], to=cur))
+        if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
+            push!(recombinations, (position=t-1, at=ref_index(from[cur, t], hmm), to=ref_index(cur, hmm)))
             cur = from[cur, t]
         end
     end
-    reverse!(recombinations)
-    return recombinations
+    sort!(recombinations, by = x -> x.at)
+    return (recombinations = recombinations, startingpoint = ref_index(cur, hmm))
 end
 
-function chimeraprobability(O::Vector{Int64}, hmm::ApproximateHMM)
-    parameterestimation!(O, hmm)
-    return forward(O, hmm)
-end
-
-function findrecombinations(O::Vector{Int64}, hmm::ApproximateHMM)
-    parameterestimation!(O, hmm)
-    return viterbi(O, hmm)
-end
-
-function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::ApproximateHMM)
-    alfa = Array{Float64}(undef, hmm.N, hmm.L)
+function parameterestimation!(O::Vector{Int64}, hmm::ApproximateHMM)
+    alpha = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
-    forward!(alfa, c, O, hmm)
+    forward!(alpha, c, O, hmm)
+    backward!(beta, c, O, hmm)
+    for i in 1:hmm.N
+        Nmut = 2.0 #pseudocount "prior"?
+        Nsame = 10.0 #pseudocount "prior"?
+        for t in 1:hmm.L
+            if O[t] != 6 #BM change, to handle non-informative obs
+                if O[t] != hmm.S[i, t]
+                    Nmut += (alpha[i, t]*beta[i, t]/c[t])
+                else
+                    Nsame += (alpha[i, t]*beta[i, t]/c[t])
+                end
+            end
+        end
+        hmm.mutation_probabilities[i] = (Nmut) / ((Nmut + Nsame))
+    end
+end
+
+function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::HMM)
+    alpha = Array{Float64}(undef, hmm.N, hmm.L)
+    beta = Array{Float64}(undef, hmm.N, hmm.L)
+    c = Array{Float64}(undef, hmm.L)
+    forward!(alpha, c, O, hmm)
     backward!(beta, c, O, hmm)
     sort!(recombs, by = x -> x.position)
     log_probability = Array{Float64}(undef, hmm.L)
     i = 1
     cur = recombs[i].at
     for t in 1:hmm.L
-        log_probability[t] = log(alfa[cur, t]) + log(beta[cur, t]) - log(c[t])
+        log_probability[t] = log(alpha[cur, t]) + log(beta[cur, t]) - log(c[t])
         if t < hmm.L && i <= length(recombs) && recombs[i].position == t
             cur = recombs[i].to
             i += 1
@@ -147,84 +137,17 @@ function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), 
     return log_probability
 end
 
-#Full Bayes version
-
-function forward(O::Vector{Int64}, hmm::FullHMM)
-    state(m, seq_idx) = (seq_idx-1)*hmm.K + m
-    seq_idx(i) = div(i-1, hmm.K) + 1
-    alfa = Matrix{Float64}(undef, 2, hmm.N)
-    for m in 1:hmm.K, seq_idx in 1:hmm.n
-        i = state(m, seq_idx)
-        alfa[1, i] = initialstate(hmm) * b(seq_idx, m, 1, O, hmm)
-        alfa[2, i] = 0.0
-    end
-    c = Vector{Float64}(undef, hmm.L)
-    c[1] = 1
-    for t in 1:hmm.L-1
-        sumalfa = 0.0
-        for i in 1:hmm.N, x in 1:2
-            sumalfa += alfa[x, i]
-        end
-        newsumalfa = 0.0
-        for m in 1:hmm.K, seq_idx in 1:hmm.n
-            j = state(m, seq_idx)
-            alfa[2, j] = ((sumalfa - sum(alfa[:, j]))*a(false, hmm) + alfa[2, j]*a(true, hmm)) * b(seq_idx, m, t+1, O, hmm)
-            alfa[1, j] = alfa[1, j] * a(true, hmm) * b(seq_idx, m, t+1, O, hmm)
-            newsumalfa += alfa[j]
-        end
-        c[t+1] = 1/newsumalfa
-        alfa .*= c[t+1]
-    end
-    #This way prevents returns > 1 due to float nonsense
-    detec = sum(alfa[2, :])
-    return detec / (sum(alfa[1, :]) + detec)   #sum(alfa[2, :]) / sum(alfa)
+function chimeraprobability(O::Vector{Int64}, hmm::T) where T <: HMM
+    T == ApproximateHMM && parameterestimation!(O, hmm)
+    return forward(O, hmm)
 end
 
-function viterbi(O::Vector{Int64}, hmm::FullHMM)
-    state(m, seq_idx) = (seq_idx-1)*hmm.K + m
-    seq_idx(i) = div(i-1, hmm.K) + 1
-    loga = Array{Float64}(undef, 2, hmm.N)
-    logb = Array{Float64}(undef, hmm.N, hmm.L)
-    loga[1, :] .= log(a(true, hmm))
-    loga[2, :] .= log(a(false, hmm))
-    for t in 1:hmm.L, m in 1:hmm.K, seq_idx in 1:hmm.n
-        logb[state(m, seq_idx), t] = log(b(seq_idx, m, t, O, hmm))
-    end
-    phi = Array{Float64}(undef, hmm.n * hmm.K)
-    from = Array{Int64}(undef, hmm.n * hmm.K, hmm.L)
-    for m in 1:hmm.K, seq_idx in 1:hmm.n
-        i = state(m, seq_idx)
-        phi[i] = log(initialstate(hmm)) + logb[i, 1]
-        from[i, 1] = i
-    end
-    for t in 1:hmm.L-1
-        max1, max2 = maxtwo(phi)
-        for m in 1:hmm.K, seq_idx in 1:hmm.n
-            j = state(m, seq_idx)
-            recomb_idx, recomb_val = max1[1] != j ? max1 : max2
-            if phi[j] + loga[1, j] > recomb_val + loga[2, j]
-                from[j, t+1] = j
-                phi[j] = phi[j] + loga[1, j] + logb[j, t+1]
-            else
-                from[j, t+1] = recomb_idx
-                phi[j] = recomb_val + loga[2, j] + logb[j, t+1]
-            end
-        end
-    end
-    cur = argmax(phi)
-    recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
-    for t in hmm.L:-1:1
-        if cur != from[cur, t]
-            push!(recombinations, (position=t-1, at=seq_idx(from[cur, t]), to=seq_idx(cur)))
-            cur = from[cur, t]
-        end
-    end
-    reverse(recombinations)
-    return (recombinations = recombinations, startingpoint = seq_idx(cur))
+function findrecombinations(O::Vector{Int64}, hmm::T) where T <: HMM
+    T == ApproximateHMM && parameterestimation!(O, hmm)
+    return viterbi(O, hmm)[1]
 end
 
-chimeraprobability(O::Vector{Int64}, hmm::FullHMM) = forward(O, hmm)
-
-findrecombinations(O::Vector{Int64}, hmm::FullHMM) = viterbi(O, hmm)[1]
-
-findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::FullHMM) = viterbi(O, hmm)
+function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::FullHMM)
+    T == ApproximateHMM && parameterestimation!(O, hmm)
+    return viterbi(O, hmm)
+end
