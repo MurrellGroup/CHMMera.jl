@@ -26,8 +26,8 @@ end
 
 Get the recombination events for a query sequence given a set of reference sequences. The return type is `Vector{NamedTuple{(:position, :at, :to), Int64, Int64, Int64}}`. Each tuple represents a recombination event and is of the form `(position, at, next)`, where `at` and `next` are indices of the references, whilst position is the site of the recombination event. `fast` is a boolean indicating whether to use the approximate HMM or the full HMM. `prior_probability` is the prior probability of a sequence being chimeric.
 """
-get_recombination_events(query::String, references::Vector{String}; fast::Bool = true, mutation_probabilities = [0.02, 0.04, 0.07, 0.11, 0.15], base_mutation_probability = 0.05, prior_probability::Float64 = 1/300) = 
-    get_recombination_events(as_ints(query), as_ints.(references), fast = fast, mutation_probabilities = mutation_probabilities, base_mutation_probability = base_mutation_probability, prior_probability = prior_probability)
+get_recombination_events(query::String, references::Vector{String}; fast::Bool = true, mutation_probabilities = [0.02, 0.04, 0.07, 0.11, 0.15], base_mutation_probability = 0.05, prior_probability::Float64 = 1/300, startingpoint = false) = 
+    get_recombination_events(as_ints(query), as_ints.(references), fast = fast, mutation_probabilities = mutation_probabilities, base_mutation_probability = base_mutation_probability, prior_probability = prior_probability, startingpoint = startingpoint)
 
 """
     get_log_site_probabilities(query::String, references::Vector{String}; fast = true, prior_probability = 1/300)
