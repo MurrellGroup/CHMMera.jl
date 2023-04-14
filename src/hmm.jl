@@ -46,11 +46,15 @@ ref_index(state_index, hmm::ApproximateHMM) = state_index
 mutationrate_index(state_index, hmm::FullHMM) = mod(state_index, hmm.K) + 1 
 mutationrate_index(state_index, hmm::ApproximateHMM) = state_index
 
+stateindicesofref(ref_idx, hmm::FullHMM) = (1 + (ref_idx-1) * hmm.K):(ref_idx * hmm.K)
+stateindicesofref(ref_idx, hmm::ApproximateHMM) = ref_idx:ref_idx
 
 initialstate(hmm::HMM) = 1 / hmm.N
 
+# transition_probability
 a(samestate::Bool, hmm::HMM) = samestate ? 1 - hmm.switch_probability : hmm.switch_probability / (hmm.N - 1)
 
+# symbol_observation_probability
 function b(i, t, O, hmm::HMM)
     if O[t] == 6
         return 1.0

@@ -1,6 +1,6 @@
 #Approx Bayes version
 
-# alpha[t, i] = probability of ending up at Sᵢ after having observed observations up to t-1
+# variable names are based on Rabiner, A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition
 
 function forward(O::Vector{Int64}, hmm::HMM)
     alpha = Matrix{Float64}(undef, 2, hmm.N)
@@ -9,9 +9,9 @@ function forward(O::Vector{Int64}, hmm::HMM)
         alpha[2, i] = 0.0
     end
     for t in 1:hmm.L-1
-        sum_alpha = sum(alpha)
+        sumalpha = sum(alpha)
         for j in 1:hmm.N
-            alpha[2, j] = ((sum_alpha - sum(alpha[:, j])) * a(false, hmm) + alpha[2, j] * a(true, hmm)) * b(j, t+1, O, hmm)
+            alpha[2, j] = ((sumalpha - sum(alpha[:, j])) * a(false, hmm) + alpha[2, j] * a(true, hmm)) * b(j, t+1, O, hmm)
             alpha[1, j] = alpha[1, j] * a(true, hmm) * b(j, t+1, O, hmm)
         end
         scaling_constant = 1/sum(alpha)
@@ -95,7 +95,7 @@ function viterbi(O::Vector{Int64}, hmm::HMM)
     return (recombinations = recombinations, startingpoint = ref_index(cur, hmm))
 end
 
-function parameterestimation!(O::Vector{Int64}, hmm::ApproximateHMM)
+function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64})
     alpha = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
@@ -117,7 +117,9 @@ function parameterestimation!(O::Vector{Int64}, hmm::ApproximateHMM)
     end
 end
 
-function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::HMM)
+function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T) where T <: HMM
+    T == ApproximateHMM && parameterestimation!(hmm, O)
+
     alpha = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
@@ -138,16 +140,57 @@ function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), 
 end
 
 function chimeraprobability(O::Vector{Int64}, hmm::T) where T <: HMM
-    T == ApproximateHMM && parameterestimation!(O, hmm)
+    T == ApproximateHMM && parameterestimation!(hmm, O)
     return forward(O, hmm)
 end
 
 function findrecombinations(O::Vector{Int64}, hmm::T) where T <: HMM
-    T == ApproximateHMM && parameterestimation!(O, hmm)
+    T == ApproximateHMM && parameterestimation!(hmm, O)
     return viterbi(O, hmm)[1]
 end
 
 function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::T) where T <: HMM
-    T == ApproximateHMM && parameterestimation!(O, hmm)
+    T == ApproximateHMM && parameterestimation!(hmm, O)
     return viterbi(O, hmm)
+end
+
+function chimerapathevaluation(O::Vector{Int64}, hmm::T) where T <: HMM
+    T == ApproximateHMM && parameterestimation!(hmm, O)
+
+    recombs, startingpoint = viterbi(O, hmm)
+    !isempty(recombs) || throw("Can't evaluate path without recombinations")
+
+    # scaling constants
+    c = Vector{Float64}(undef, hmm.L)
+    # forward
+    alpha = Matrix{Float64}(undef, hmm.N, hmm.L) 
+    forward!(alpha, c, O, hmm)
+    # backward
+    beta = Matrix{Float64}(undef, hmm.N, hmm.L)
+    backward!(beta, c, O, hmm)
+
+    # Normalized log probability of being at each position, (state_index, site_index)
+    logp_position = Matrix{Float64}(undef, hmm.N, hmm.L)
+    for t in 1:hmm.L
+        p_position = alpha[:, t] .* beta[:, t] # unnormalized
+        logp_position[:, t] = log.(p_position) .- log(sum(p_position)) # log normalized
+    end
+
+    # p_ref[i] = the probability of being at ref[i] at the time t, for the t that maximizes this probability, where t ∈ {t : viterbi_path[t] == ref[i]}
+    p_ref = Dict(union([startingpoint => 0.0], [recomb.to => 0.0 for recomb in recombs]))
+
+    cur = startingpoint
+    recombindex = 1
+    for t in 1:hmm.L
+        # For the fullbayesian version, each reference has multiple states, hence why we use stateindicesofref
+        # exp(logp_position[i, t]) should not underflow here, since we are iterating over the path with the highest (log)probability
+        p_ref[cur] = max(sum( exp(logp_position[i, t]) for i in stateindicesofref(cur, hmm) ), p_ref[cur])
+        if recombindex <= length(recombs) && t == recombs[recombindex].position
+            cur = recombs[recombindex].to
+            recombindex += 1
+        end
+    end
+
+    probability_of_2nd_most_probable_ref = sort(collect(values(p_ref)))[end - 1]
+    return probability_of_2nd_most_probable_ref
 end

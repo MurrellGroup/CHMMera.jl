@@ -42,7 +42,18 @@ function get_log_site_probabilities(query::String, references::Vector{String}; f
     end
 
     O = as_ints(query)
-    hmm = ApproximateHMM(vovtomatrix(as_ints.(references)), 0.05, prior_probability)
-    parameterestimation!(O, hmm)
+    hmm = fast ? ApproximateHMM(vovtomatrix(as_ints.(references)), base_mutation_probability, prior_probability) : FullHMM(vovtomatrix(as_ints.(references)), mutation_probabilities, prior_probability)
+
     return logsiteprobabilities(recombs, O, hmm)
+end
+
+function get_chimerapathevaluation(query::String, references::Vector{String}; fast::Bool = true, mutation_probabilities = [0.02, 0.04, 0.07, 0.11, 0.15], base_mutation_probability = 0.05, prior_probability::Float64 = 1/300)
+    O = as_ints(query)
+    if fast
+        hmm = ApproximateHMM(vovtomatrix(as_ints.(references)), base_mutation_probability, prior_probability)
+    else
+        hmm = FullHMM(vovtomatrix(as_ints.(references)), mutation_probabilities, prior_probability)
+    end
+
+    return chimerapathevaluation(O, hmm)
 end
