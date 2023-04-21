@@ -57,37 +57,31 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, 
 end
 
 function viterbi(O::Vector{Int64}, hmm::HMM)
-    loga = Array{Float64}(undef, 2, hmm.N)
-    logb = Array{Float64}(undef, hmm.N, hmm.L)
-    loga[1, :] .= log(a(true, hmm))
-    loga[2, :] .= log(a(false, hmm))
-    for t in 1:hmm.L, i in 1:hmm.N
-        logb[i, t] = log(b(i, t, O, hmm))
-    end
     phi = Array{Float64}(undef, hmm.N)
     from = Array{Int64}(undef, hmm.N, hmm.L)
     for i in 1:hmm.N 
-        phi[i] = log(initialstate(hmm)) + logb[i, 1]
+        phi[i] = log(initialstate(hmm) * b(i, 1, O, hmm))
         from[i, 1] = i
     end
     for t in 1:hmm.L-1
-        max1, max2 = maxtwo(phi)
+        maxstate = argmax(phi)
         for j in 1:hmm.N
-            recomb_idx, recomb_val = max1[1] != j ? max1 : max2
-            if phi[j] + loga[1, j] > recomb_val + loga[2, j]
+            if phi[j] + log(a(true, hmm)) > phi[maxstate] + log(a(false, hmm)) || j == maxstate
                 from[j, t+1] = j
-                phi[j] = phi[j] + loga[1, j] + logb[j, t+1]
+                phi[j] = phi[j] + log(a(true, hmm)) + log(b(j, t+1, O, hmm))
             else
-                from[j, t+1] = recomb_idx
-                phi[j] = recomb_val + loga[2, j] + logb[j, t+1]
+                from[j, t+1] = maxstate
+                phi[j] = phi[maxstate] + log(a(false, hmm)) + log(b(j, t+1, O, hmm))
             end
         end
     end
     cur = argmax(phi)
     recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
     for t in hmm.L:-1:1
-        if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
-            push!(recombinations, (position=t-1, at=ref_index(from[cur, t], hmm), to=ref_index(cur, hmm)))
+        if cur != from[cur, t]
+            if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
+                push!(recombinations, (position=t-1, at=ref_index(from[cur, t], hmm), to=ref_index(cur, hmm)))
+            end
             cur = from[cur, t]
         end
     end

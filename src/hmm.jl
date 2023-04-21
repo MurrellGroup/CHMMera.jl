@@ -39,11 +39,10 @@ function FullHMM(references::Matrix{Int64}, mutation_probabilities::Vector{Float
     return FullHMM(N, n, L, K, S, mutation_probabilities, switch_probability)
 end
 
-ref_index(state_index, hmm::FullHMM) = div(state_index-1, hmm.K) + 1
+ref_index(state_index, hmm::FullHMM) = div(state_index - 1, hmm.K) + 1
 ref_index(state_index, hmm::ApproximateHMM) = state_index
 
-# mod(state_index, hmm.K) + 1 is correct but rewraps weird, (2, 3, ..., K, 1) instead of (1, 2, 3, ..., K), but it's slightly faster and less code than using an explicit rewrapping function.
-mutationrate_index(state_index, hmm::FullHMM) = mod(state_index, hmm.K) + 1 
+mutationrate_index(state_index, hmm::FullHMM) = mod(state_index - 1, hmm.K) + 1
 mutationrate_index(state_index, hmm::ApproximateHMM) = state_index
 
 stateindicesofref(ref_idx, hmm::FullHMM) = (1 + (ref_idx-1) * hmm.K):(ref_idx * hmm.K)
