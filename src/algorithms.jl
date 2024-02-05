@@ -292,6 +292,89 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, 
     end
 end
 
+function chimerapathevaluation(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
+
+    recombs, startingpoint = viterbi(O, hmm, mutation_probabilities)
+    !isempty(recombs) || throw("Can't evaluate path without recombinations")
+
+    # scaling constants
+    c = Vector{Float64}(undef, hmm.L)
+    # forward
+    alpha = Matrix{Float64}(undef, hmm.N, hmm.L) 
+    forward!(alpha, c, O, hmm, mutation_probabilities)
+    # backward
+    beta = Matrix{Float64}(undef, hmm.N, hmm.L)
+    backward!(beta, c, O, hmm, mutation_probabilities)
+
+    # Normalized log probability of being at each position, (state_index, site_index)
+    logp_position = Matrix{Float64}(undef, hmm.N, hmm.L)
+    for t in 1:hmm.L
+        p_position = alpha[:, t] .* beta[:, t] # unnormalized
+        logp_position[:, t] = log.(p_position) .- log(sum(p_position)) # log normalized
+    end
+
+    # p_ref[i] = the probability of being at ref[i] at the time t, for the t that maximizes this probability, where t ∈ {t : viterbi_path[t] == ref[i]}
+    p_ref = Dict(union([startingpoint => 0.0], [recomb.to => 0.0 for recomb in recombs]))
+
+    cur = startingpoint
+    recombindex = 1
+    for t in 1:hmm.L
+        # For the fullbayesian version, each reference has multiple states, hence why we use stateindicesofref
+        # exp(logp_position[i, t]) should not underflow here, since we are iterating over the path with the highest (log)probability
+        p_ref[cur] = max(sum( exp(logp_position[i, t]) for i in stateindicesofref(cur, hmm) ), p_ref[cur])
+        if recombindex <= length(recombs) && t == recombs[recombindex].position
+            cur = recombs[recombindex].to
+            recombindex += 1
+        end
+    end
+
+    probability_of_2nd_most_probable_ref = sort(collect(values(p_ref)))[end - 1]
+    return probability_of_2nd_most_probable_ref
+end
+
+function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
+    recombs, startingpoint = viterbi(O, hmm, mutation_probabilities)
+    if isempty(recombs)
+        return (recombs = recombs, startingpoint = startingpoint, pathevaluation = 0.0)
+    end
+
+    # scaling constants
+    c = Vector{Float64}(undef, hmm.L)
+    # forward
+    alpha = Matrix{Float64}(undef, hmm.N, hmm.L) 
+    forward!(alpha, c, O, hmm, mutation_probabilities)
+    # backward
+    beta = Matrix{Float64}(undef, hmm.N, hmm.L)
+    backward!(beta, c, O, hmm, mutation_probabilities)
+
+    # Normalized log probability of being at each position, (state_index, site_index)
+    logp_position = Matrix{Float64}(undef, hmm.N, hmm.L)
+    for t in 1:hmm.L
+        p_position = alpha[:, t] .* beta[:, t] # unnormalized
+        logp_position[:, t] = log.(p_position) .- log(sum(p_position)) # log normalized
+    end
+
+    # p_ref[i] = the probability of being at ref[i] at the time t, for the t that maximizes this probability, where t ∈ {t : viterbi_path[t] == ref[i]}
+    p_ref = Dict(union([startingpoint => 0.0], [recomb.to => 0.0 for recomb in recombs]))
+
+    cur = startingpoint
+    recombindex = 1
+    for t in 1:hmm.L
+        # For the fullbayesian version, each reference has multiple states, hence why we use stateindicesofref
+        # exp(logp_position[i, t]) should not underflow here, since we are iterating over the path with the highest (log)probability
+        p_ref[cur] = max(sum( exp(logp_position[i, t]) for i in stateindicesofref(cur, hmm) ), p_ref[cur])
+        if recombindex <= length(recombs) && t == recombs[recombindex].position
+            cur = recombs[recombindex].to
+            recombindex += 1
+        end
+    end
+
+    probability_of_2nd_most_probable_ref = sort(collect(values(p_ref)))[end - 1]
+    return (recombs = recombs, startingpoint = startingpoint, pathevaluation = probability_of_2nd_most_probable_ref)
+end
+
 function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     return viterbi(O, hmm, mutation_probabilities)
@@ -338,46 +421,7 @@ function findrecombinations(O::Vector{Int64}, hmm::T, mutation_probabilities::Ve
 end
 
 
-function chimerapathevaluation(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
-    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
 
-    recombs, startingpoint = viterbi(O, hmm, mutation_probabilities)
-    !isempty(recombs) || throw("Can't evaluate path without recombinations")
-
-    # scaling constants
-    c = Vector{Float64}(undef, hmm.L)
-    # forward
-    alpha = Matrix{Float64}(undef, hmm.N, hmm.L) 
-    forward!(alpha, c, O, hmm, mutation_probabilities)
-    # backward
-    beta = Matrix{Float64}(undef, hmm.N, hmm.L)
-    backward!(beta, c, O, hmm, mutation_probabilities)
-
-    # Normalized log probability of being at each position, (state_index, site_index)
-    logp_position = Matrix{Float64}(undef, hmm.N, hmm.L)
-    for t in 1:hmm.L
-        p_position = alpha[:, t] .* beta[:, t] # unnormalized
-        logp_position[:, t] = log.(p_position) .- log(sum(p_position)) # log normalized
-    end
-
-    # p_ref[i] = the probability of being at ref[i] at the time t, for the t that maximizes this probability, where t ∈ {t : viterbi_path[t] == ref[i]}
-    p_ref = Dict(union([startingpoint => 0.0], [recomb.to => 0.0 for recomb in recombs]))
-
-    cur = startingpoint
-    recombindex = 1
-    for t in 1:hmm.L
-        # For the fullbayesian version, each reference has multiple states, hence why we use stateindicesofref
-        # exp(logp_position[i, t]) should not underflow here, since we are iterating over the path with the highest (log)probability
-        p_ref[cur] = max(sum( exp(logp_position[i, t]) for i in stateindicesofref(cur, hmm) ), p_ref[cur])
-        if recombindex <= length(recombs) && t == recombs[recombindex].position
-            cur = recombs[recombindex].to
-            recombindex += 1
-        end
-    end
-
-    probability_of_2nd_most_probable_ref = sort(collect(values(p_ref)))[end - 1]
-    return probability_of_2nd_most_probable_ref
-end
 
 
 function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
