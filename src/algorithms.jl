@@ -337,7 +337,7 @@ function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{Int64
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     recombs, startingpoint = viterbi(O, hmm, mutation_probabilities)
     if isempty(recombs)
-        return (recombs = recombs, startingpoint = startingpoint, pathevaluation = 0.0)
+        return (recombinations = recombs, startingpoint = startingpoint, pathevaluation = 0.0)
     end
 
     # scaling constants
@@ -372,7 +372,7 @@ function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{Int64
     end
 
     probability_of_2nd_most_probable_ref = sort(collect(values(p_ref)))[end - 1]
-    return (recombs = recombs, startingpoint = startingpoint, pathevaluation = probability_of_2nd_most_probable_ref)
+    return (recombinations = recombs, startingpoint = startingpoint, pathevaluation = probability_of_2nd_most_probable_ref)
 end
 
 function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
