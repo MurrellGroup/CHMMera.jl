@@ -75,20 +75,3 @@ function b(i, t, O, hmm::HMM, mutation_probabilities::Vector{Float64})
         return O[t] == hmm.S[ref_index(i, hmm), t] ? 1 - mutation_probabilities[mutationrate_index(i, hmm)] : mutation_probabilities[mutationrate_index(i, hmm)] / 5
     end
 end
-
-
-
-a(samestate::Bool, hmm::Ref{HMM}) = samestate ? 1 - hmm.switch_probability : hmm.switch_probability / (hmm.N - 1)
-
-
-# symbol_observation_probability with mutation_probabilities factored out of the hmm to allow multiple threads to use the same hmm
-function b(i, t, O, hmm::Ref{HMM}, mutation_probabilities::Vector{Float64})
-    if O[t] == 6
-        return 1.0
-    else
-        #BM: Changed denom to 5 to avoid "cheating" with gaps.
-        #We might want to have a separate "indel" rate though.
-        return O[t] == hmm.S[ref_index(i, hmm), t] ? 1 - mutation_probabilities[mutationrate_index(i, hmm)] : mutation_probabilities[mutationrate_index(i, hmm)] / 5
-    end
-end
-

@@ -219,17 +219,8 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64}, mutation_pr
     end
 end
 
-using Base.Threads
-
 
 function chimeraprobability(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
-
-    function unsafe_pointer_from_objectref(@nospecialize(x))
-        #= Warning Danger=#
-        ccall(:jl_value_ptr, Ptr{Cvoid}, (Any,), x)
-    end
-#    @info "Thread ID: $(threadid()) Unique var address: $(unsafe_pointer_from_objectref(mutation_probabilities))"
-#    @info "Thread ID: $(threadid()) Shared var address: $(unsafe_pointer_from_objectref(hmm))"
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     return forward(O, hmm, mutation_probabilities::Vector{Float64})
 end
@@ -388,15 +379,19 @@ function viterbi(O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Floa
         phi[i] = log(initialstate(hmm) * b(i, 1, O, hmm, mutation_probabilities))
         from[i, 1] = i
     end
+
+    # calling log takes time - precompute some here
+    log_samestate_a = log(a(true, hmm))
+    log_diffstate_a = log(a(false, hmm))
     for t in 1:hmm.L-1
         maxstate = argmax(phi)
         for j in 1:hmm.N
-            if phi[j] + log(a(true, hmm)) > phi[maxstate] + log(a(false, hmm)) || j == maxstate
+            if phi[j] + log_samestate_a > phi[maxstate] + log_diffstate_a || j == maxstate
                 from[j, t+1] = j
-                phi[j] = phi[j] + log(a(true, hmm)) + log(b(j, t+1, O, hmm, mutation_probabilities))
+                phi[j] = phi[j] + log_samestate_a + log(b(j, t+1, O, hmm, mutation_probabilities))
             else
                 from[j, t+1] = maxstate
-                phi[j] = phi[maxstate] + log(a(false, hmm)) + log(b(j, t+1, O, hmm, mutation_probabilities))
+                phi[j] = phi[maxstate] + log_diffstate_a + log(b(j, t+1, O, hmm, mutation_probabilities))
             end
         end
     end
