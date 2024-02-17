@@ -98,20 +98,21 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64})
     c = Array{Float64}(undef, hmm.L)
     forward!(alpha, c, O, hmm)
     backward!(beta, c, O, hmm)
-    for i in 1:hmm.N
-        Nmut = 2.0 #pseudocount "prior"?
-        Nsame = 10.0 #pseudocount "prior"?
-        for t in 1:hmm.L
+	Nmut = fill(2.0, hmm.N) # pseudocount prior
+	Nsame = fill(10.0, hmm.N) # pseudocount prior    
+	for t in 1:hmm.L
+		Z = sum(alpha[:, t] .* beta[:, t])
+        for i in 1:hmm.N
             if O[t] != 6 #BM change, to handle non-informative obs
                 if O[t] != hmm.S[i, t]
-                    Nmut += (alpha[i, t]*beta[i, t]/c[t])
+                    Nmut[i] += alpha[i, t] * beta[i, t] / Z
                 else
-                    Nsame += (alpha[i, t]*beta[i, t]/c[t])
-                end
+                    Nsame[i] += alpha[i, t] * beta[i, t] / Z
+                end 
             end
         end
-        hmm.mutation_probabilities[i] = (Nmut) / ((Nmut + Nsame))
-    end
+    end 
+    hmm.mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)
 end
 
 function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T) where T <: HMM
@@ -127,7 +128,7 @@ function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), 
     i = 1
     cur = recombs[i].at
     for t in 1:hmm.L
-        log_probability[t] = log(alpha[cur, t]) + log(beta[cur, t]) - log(c[t])
+        log_probability[t] = log(alpha[cur, t]) + log(beta[cur, t]) - log(sum(alpha[:, t] .* beta[:, t]))
         if t < hmm.L && i <= length(recombs) && recombs[i].position == t
             cur = recombs[i].to
             i += 1
@@ -203,22 +204,22 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64}, mutation_pr
     c = Array{Float64}(undef, hmm.L)
     forward!(alpha, c, O, hmm, mutation_probabilities)
     backward!(beta, c, O, hmm, mutation_probabilities)
-    for i in 1:hmm.N
-        Nmut = 2.0 #pseudocount "prior"?
-        Nsame = 10.0 #pseudocount "prior"?
-        for t in 1:hmm.L
+	Nmut = fill(2.0, hmm.N) # pseudocount prior
+    Nsame = fill(10.0, hmm.N) # pseudocount prior    
+    for t in 1:hmm.L
+        Z = sum(alpha[:, t] .* beta[:, t])
+        for i in 1:hmm.N
             if O[t] != 6 #BM change, to handle non-informative obs
                 if O[t] != hmm.S[i, t]
-                    Nmut += (alpha[i, t]*beta[i, t]/c[t])
+                    Nmut[i] += alpha[i, t] * beta[i, t] / Z
                 else
-                    Nsame += (alpha[i, t]*beta[i, t]/c[t])
+                    Nsame[i] += alpha[i, t] * beta[i, t] / Z
                 end
             end
         end
-        mutation_probabilities[i] = (Nmut) / ((Nmut + Nsame))
     end
+    mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)	
 end
-
 
 function chimeraprobability(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
@@ -436,7 +437,7 @@ function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), 
     i = 1
     cur = recombs[i].at
     for t in 1:hmm.L
-        log_probability[t] = log(alpha[cur, t]) + log(beta[cur, t]) - log(c[t])
+        log_probability[t] = log(alpha[cur, t]) + log(beta[cur, t]) - log(sum(alpha[:, t] .* beta[:, t]))
         if t < hmm.L && i <= length(recombs) && recombs[i].position == t
             cur = recombs[i].to
             i += 1
