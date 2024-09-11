@@ -183,7 +183,7 @@ end
 
 function viterbi(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64})
     phi = Array{Float64}(undef, hmm.N)
-    from = Array{UInt8}(undef, hmm.N, hmm.L)
+    from = Array{Int64}(undef, hmm.N, hmm.L)
     for i in 1:hmm.N 
         phi[i] = log(initialstate(hmm) * b(i, 1, O, hmm, mutation_probabilities))
         from[i, 1] = i
@@ -205,7 +205,7 @@ function viterbi(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Floa
         end
     end
     cur = argmax(phi)
-    recombinations = NamedTuple{(:position, :at, :to), Tuple{UInt8, UInt8, UInt8}}[]
+    recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
     for t in hmm.L:-1:1
         if cur != from[cur, t]
             if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
@@ -228,7 +228,7 @@ end
 
 
 
-function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{UInt8, UInt8, UInt8}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     # length(recombs) > 0 || "No recombinations found, can only be run on chimeric sequences"
     if length(recombs) == 0
         return zeros(Float64, length(O))
