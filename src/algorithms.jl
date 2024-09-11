@@ -211,9 +211,6 @@ function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, O::Vector{UInt8}, 
     end
     for t in 1:hmm.L-1
         sumalpha = sum(alpha[:,t])
-#        for x in alpha[:, t]
-#            sumalpha += x
-#        end
         for j in 1:hmm.N
             alpha[j, t+1] = ((sumalpha-alpha[j, t])*a(false, hmm) + alpha[j, t]*a(true, hmm)) * b(j, t+1, O, hmm, mutation_probabilities)
         end

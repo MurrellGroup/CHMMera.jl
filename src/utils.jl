@@ -11,17 +11,36 @@ function as_string(seq::Vector{UInt8})
     mymap = ["A", "C", "G", "T", "-", "N"]
     return join((mymap[nt] for nt in seq))
 end
-NUC2INT = Dict('A' => 1, 'C' => 2, 'G' => 3, 'T' => 4, '-' => 5, 'N' => 6)
+
+const NUC2INT = (
+    'A' => 0x01,
+    'C' => 0x02,
+    'G' => 0x03,
+    'T' => 0x04,
+    '-' => 0x05,
+    'N' => 0x06
+)
+
+# lookup tables are faster than dicts
+const NUC2INT_LOOKUP = let
+    table = fill(0x06, 256) 
+    for (k, v) in NUC2INT
+        table[Int(k)] = v
+    end
+    tuple(table...) 
+end
+
 
 function as_ints(seq::String)
     ints = Vector{UInt8}(undef, length(seq))
-    for i in eachindex(seq)
-        ints[i] = NUC2INT[seq[i]]
+    c_ints = Int.(codeunits(seq))
+    @inbounds for i in eachindex(seq)
+        ints[i] = NUC2INT_LOOKUP[c_ints[i]]
     end
     return ints
 end
 
-function vovtomatrix(vov)
+function vovtomatrix(vov::Vector{Vector{UInt8}})
     n = length(vov)
     L = minimum(length.(vov))
     mat = Matrix{UInt8}(undef, n, L)
