@@ -1,51 +1,5 @@
-#Approx Bayes version
 
-# variable names are based on Rabiner, A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition
-
-function forward(O::Vector{Int64}, hmm::HMM)
-    alpha = Matrix{Float64}(undef, 2, hmm.N)
-    for i in 1:hmm.N
-        alpha[1, i] = initialstate(hmm) * b(i, 1, O, hmm)
-        alpha[2, i] = 0.0
-    end
-    for t in 1:hmm.L-1
-        alpha_colsums = sum.(eachcol(alpha))
-        sumalpha = sum(alpha)
-        for j in 1:hmm.N
-            bval = b(j, t+1, O, hmm)
-            alpha[2, j] = ((sumalpha - alpha_colsums[j]) * a(false, hmm) + alpha[2, j] * a(true, hmm)) * bval
-            alpha[1, j] = alpha[1, j] * a(true, hmm) * bval
-
-        end
-        scaling_constant = 1/sum(alpha)
-        alpha .*= scaling_constant
-    end
-    
-    detec = sum(alpha[2, :])
-    return detec / (sum(alpha[1, :]) + detec)   #sum(alpha[2, :]) / sum(alpha)
-end
-
-function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::HMM)
-    c[1] = 1
-    for i in 1:hmm.N
-        alpha[i, 1] = initialstate(hmm) * b(i, 1, O, hmm)
-    end
-    for t in 1:hmm.L-1
-        sumalpha = 0.0
-        for x in alpha[:, t]
-            sumalpha += x
-        end
-        newsumalpha = 0.0
-        for j in 1:hmm.N
-            alpha[j, t+1] = ((sumalpha-alpha[j, t])*a(false, hmm) + alpha[j, t]*a(true, hmm)) * b(j, t+1, O, hmm)
-            newsumalpha += alpha[j, t+1]
-        end
-        c[t+1] = 1/newsumalpha
-        alpha[:,t+1] .*= c[t+1]
-    end
-end
-
-function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::HMM)
+function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{UInt8}, hmm::HMM)
     beta[:, hmm.L] .= c[hmm.L]
     for t in hmm.L-1:-1:1
         sumbeta = 0.0
@@ -59,9 +13,9 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, 
     end
 end
 
-function viterbi(O::Vector{Int64}, hmm::HMM)
+function viterbi(O::Vector{UInt8}, hmm::HMM)
     phi = Array{Float64}(undef, hmm.N)
-    from = Array{Int64}(undef, hmm.N, hmm.L)
+    from = Array{UInt8}(undef, hmm.N, hmm.L)
     for i in 1:hmm.N 
         phi[i] = log(initialstate(hmm) * b(i, 1, O, hmm))
         from[i, 1] = i
@@ -79,7 +33,7 @@ function viterbi(O::Vector{Int64}, hmm::HMM)
         end
     end
     cur = argmax(phi)
-    recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
+    recombinations = NamedTuple{(:position, :at, :to), Tuple{UInt8, UInt8, UInt8}}[]
     for t in hmm.L:-1:1
         if cur != from[cur, t]
             if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
@@ -92,7 +46,7 @@ function viterbi(O::Vector{Int64}, hmm::HMM)
     return (recombinations = recombinations, startingpoint = ref_index(cur, hmm))
 end
 
-function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64})
+function parameterestimation!(hmm::ApproximateHMM, O::Vector{UInt8})
     alpha = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
@@ -115,7 +69,7 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64})
     hmm.mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)
 end
 
-function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T) where T <: HMM
+function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{UInt8, UInt8, UInt8}}}, O::Vector{Int}, hmm::T) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O)
 
     alpha = Array{Float64}(undef, hmm.N, hmm.L)
@@ -137,22 +91,22 @@ function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), 
     return log_probability
 end
 
-function chimeraprobability(O::Vector{Int64}, hmm::T) where T <: HMM
+function chimeraprobability(O::Vector{UInt8}, hmm::T) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O)
     return forward(O, hmm)
 end
 
-function findrecombinations(O::Vector{Int64}, hmm::T) where T <: HMM
+function findrecombinations(O::Vector{UInt8}, hmm::T) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O)
     return viterbi(O, hmm)[1]
 end
 
-function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::T) where T <: HMM
+function findrecombinations_and_startingpoint(O::Vector{UInt8}, hmm::T) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O)
     return viterbi(O, hmm)
 end
 
-function chimerapathevaluation(O::Vector{Int64}, hmm::T) where T <: HMM
+function chimerapathevaluation(O::Vector{UInt8}, hmm::T) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O)
 
     recombs, startingpoint = viterbi(O, hmm)
@@ -198,7 +152,7 @@ end
 
 
 # parameter estimation with the mutation_probabilities factored out of the hmm object to allow multithreading
-function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64}, mutation_probabilities::Vector{Float64})
+function parameterestimation!(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_probabilities::Vector{Float64})
     alpha = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
@@ -221,12 +175,12 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{Int64}, mutation_pr
     mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)	
 end
 
-function chimeraprobability(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function chimeraprobability(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     return forward(O, hmm, mutation_probabilities::Vector{Float64})
 end
 
-function forward(O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Float64})
+function forward(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64})
     alpha = Matrix{Float64}(undef, 2, hmm.N)
     for i in 1:hmm.N
         alpha[1, i] = initialstate(hmm) * b(i, 1, O, hmm, mutation_probabilities)
@@ -250,27 +204,25 @@ function forward(O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Floa
 end
 
 
-function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Float64})
+function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64})
     c[1] = 1
     for i in 1:hmm.N
         alpha[i, 1] = initialstate(hmm) * b(i, 1, O, hmm, mutation_probabilities)
     end
     for t in 1:hmm.L-1
-        sumalpha = 0.0
-        for x in alpha[:, t]
-            sumalpha += x
-        end
-        newsumalpha = 0.0
+        sumalpha = sum(alpha[:,t])
+#        for x in alpha[:, t]
+#            sumalpha += x
+#        end
         for j in 1:hmm.N
             alpha[j, t+1] = ((sumalpha-alpha[j, t])*a(false, hmm) + alpha[j, t]*a(true, hmm)) * b(j, t+1, O, hmm, mutation_probabilities)
-            newsumalpha += alpha[j, t+1]
         end
-        c[t+1] = 1/newsumalpha
+        c[t+1] = 1 / sum(alpha[:, t+1])
         alpha[:,t+1] .*= c[t+1]
     end
 end
 
-function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Float64})
+function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64})
     beta[:, hmm.L] .= c[hmm.L]
     for t in hmm.L-1:-1:1
         sumbeta = 0.0
@@ -284,7 +236,7 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{Int64}, 
     end
 end
 
-function chimerapathevaluation(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function chimerapathevaluation(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
 
     recombs, startingpoint = viterbi(O, hmm, mutation_probabilities)
@@ -325,7 +277,7 @@ function chimerapathevaluation(O::Vector{Int64}, hmm::T, mutation_probabilities:
     return probability_of_2nd_most_probable_ref
 end
 
-function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     recombs, startingpoint = viterbi(O, hmm, mutation_probabilities)
     if isempty(recombs)
@@ -367,15 +319,15 @@ function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{Int64
     return (recombinations = recombs, startingpoint = startingpoint, pathevaluation = probability_of_2nd_most_probable_ref)
 end
 
-function findrecombinations_and_startingpoint(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function findrecombinations_and_startingpoint(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     return viterbi(O, hmm, mutation_probabilities)
 end
 
 
-function viterbi(O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Float64})
+function viterbi(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64})
     phi = Array{Float64}(undef, hmm.N)
-    from = Array{Int64}(undef, hmm.N, hmm.L)
+    from = Array{UInt8}(undef, hmm.N, hmm.L)
     for i in 1:hmm.N 
         phi[i] = log(initialstate(hmm) * b(i, 1, O, hmm, mutation_probabilities))
         from[i, 1] = i
@@ -397,7 +349,7 @@ function viterbi(O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Floa
         end
     end
     cur = argmax(phi)
-    recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
+    recombinations = NamedTuple{(:position, :at, :to), Tuple{UInt8, UInt8, UInt8}}[]
     for t in hmm.L:-1:1
         if cur != from[cur, t]
             if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
@@ -411,7 +363,7 @@ function viterbi(O::Vector{Int64}, hmm::HMM, mutation_probabilities::Vector{Floa
 end
 
 
-function findrecombinations(O::Vector{Int64}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function findrecombinations(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     return viterbi(O, hmm, mutation_probabilities)[1]
 end
@@ -420,7 +372,7 @@ end
 
 
 
-function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{UInt8, UInt8, UInt8}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     # length(recombs) > 0 || "No recombinations found, can only be run on chimeric sequences"
     if length(recombs) == 0
         return zeros(Float64, length(O))

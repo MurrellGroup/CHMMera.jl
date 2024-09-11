@@ -7,20 +7,24 @@ end
 
 # For interface
 
-function as_string(seq::Vector{Int64})
+function as_string(seq::Vector{UInt8})
     mymap = ["A", "C", "G", "T", "-", "N"]
     return join((mymap[nt] for nt in seq))
 end
+NUC2INT = Dict('A' => 1, 'C' => 2, 'G' => 3, 'T' => 4, '-' => 5, 'N' => 6)
 
 function as_ints(seq::String)
-    mymap = ['A', 'C', 'G', 'T', '-', 'N']
-    return Int64[findfirst(mymap.==uppercase(nt)) for nt in seq]
+    ints = Vector{UInt8}(undef, length(seq))
+    for i in eachindex(seq)
+        ints[i] = NUC2INT[seq[i]]
+    end
+    return ints
 end
 
 function vovtomatrix(vov)
     n = length(vov)
     L = minimum(length.(vov))
-    mat = Matrix{Int64}(undef, n, L)
+    mat = Matrix{UInt8}(undef, n, L)
     for j=1:L, i=1:n
         mat[i, j] = vov[i][j]
     end
