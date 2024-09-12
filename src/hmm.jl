@@ -40,14 +40,14 @@ function FullHMM(references::Matrix{UInt8}, mutation_probabilities::Vector{Float
     return FullHMM(N, n, L, K, S, switch_probability)
 end
 
-ref_index(state_index, hmm::FullHMM) = div(state_index - 1, hmm.K) + 1
-ref_index(state_index, hmm::ApproximateHMM) = state_index
+ref_index(state_index::Int64, hmm::FullHMM) = div(state_index - 1, hmm.K) + 1
+ref_index(state_index::Int64, hmm::ApproximateHMM) = state_index
 
-mutationrate_index(state_index, hmm::FullHMM) = mod(state_index - 1, hmm.K) + 1
-mutationrate_index(state_index, hmm::ApproximateHMM) = state_index
+mutationrate_index(state_index::Int64, hmm::FullHMM) = mod(state_index - 1, hmm.K) + 1
+mutationrate_index(state_index::Int64, hmm::ApproximateHMM) = state_index
 
-stateindicesofref(ref_idx, hmm::FullHMM) = (1 + (ref_idx-1) * hmm.K):(ref_idx * hmm.K)
-stateindicesofref(ref_idx, hmm::ApproximateHMM) = ref_idx:ref_idx
+stateindicesofref(ref_idx::Int64, hmm::FullHMM) = (1 + (ref_idx-1) * hmm.K):(ref_idx * hmm.K)
+stateindicesofref(ref_idx::Int64, hmm::ApproximateHMM) = ref_idx:ref_idx
 
 initialstate(hmm::HMM) = 1 / hmm.N
 
@@ -55,7 +55,7 @@ initialstate(hmm::HMM) = 1 / hmm.N
 a(samestate::Bool, hmm::HMM) = samestate ? 1 - hmm.switch_probability : hmm.switch_probability / (hmm.N - 1)
 
 # symbol_observation_probability
-function b(i, t, O, hmm::HMM)
+function b(i::Int64, t::Int64, O::Vector{UInt8}, hmm::HMM)
     if O[t] == 6
         return 1.0
     else
@@ -66,7 +66,7 @@ function b(i, t, O, hmm::HMM)
 end
 
 # symbol_observation_probability with mutation_probabilities factored out of the hmm to allow multiple threads to use the same hmm
-function b(i, t, O, hmm::HMM, mutation_probabilities::Vector{Float64})
+function b(i::Int64, t::Int64, O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64})
     if O[t] == 6
         return 1.0
     else

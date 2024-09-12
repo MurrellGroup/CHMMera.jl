@@ -215,7 +215,7 @@ function viterbi(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Floa
         end
     end
     sort!(recombinations, by = x -> x.at)
-    return (recombinations = recombinations, startingpoint = ref_index(cur, hmm))
+    return (recombinations = recombinations, startingpoint = ref_index(cur, hmm), pathevaluation = nothing)
 end
 
 
@@ -223,10 +223,6 @@ function findrecombinations(O::Vector{UInt8}, hmm::T, mutation_probabilities::Ve
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
     return viterbi(O, hmm, mutation_probabilities)[1]
 end
-
-
-
-
 
 function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     # length(recombs) > 0 || "No recombinations found, can only be run on chimeric sequences"
