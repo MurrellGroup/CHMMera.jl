@@ -215,13 +215,13 @@ function viterbi(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Floa
         end
     end
     sort!(recombinations, by = x -> x.at)
-    return (recombinations = recombinations, startingpoint = ref_index(cur, hmm), pathevaluation = nothing)
+    return (recombinations = recombinations, startingpoint = ref_index(cur, hmm), pathevaluation = -1)
 end
 
 
 function findrecombinations(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities)
-    return viterbi(O, hmm, mutation_probabilities)[1]
+    return viterbi(O, hmm, mutation_probabilities)
 end
 
 function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
