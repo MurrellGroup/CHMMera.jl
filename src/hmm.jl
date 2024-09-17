@@ -6,6 +6,7 @@ struct ApproximateHMM <: HMM
     N::Int64 # Number of states (equal to number of reference sequences)
     L::Int64 # Length of reference sequences
     S::Matrix{UInt8} # Reference sequences
+
 #    mutation_probabilities::Vector{Float64} # Mutation rate for each reference sequence - each ref has it's own mutation rate.
     switch_probability::Float64 # Probability of switching to a different reference sequence
 end
@@ -43,9 +44,6 @@ end
 ref_index(state_index::Int64, hmm::FullHMM) = div(state_index - 1, hmm.K) + 1
 ref_index(state_index::Int64, hmm::ApproximateHMM) = state_index
 
-mutationrate_index(state_index::Int64, hmm::FullHMM) = mod(state_index - 1, hmm.K) + 1
-mutationrate_index(state_index::Int64, hmm::ApproximateHMM) = state_index
-
 stateindicesofref(ref_idx::Int64, hmm::FullHMM) = (1 + (ref_idx-1) * hmm.K):(ref_idx * hmm.K)
 stateindicesofref(ref_idx::Int64, hmm::ApproximateHMM) = ref_idx:ref_idx
 
@@ -54,24 +52,47 @@ initialstate(hmm::HMM) = 1 / hmm.N
 # transition_probability
 a(samestate::Bool, hmm::HMM) = samestate ? 1 - hmm.switch_probability : hmm.switch_probability / (hmm.N - 1)
 
-# symbol_observation_probability
-function b(i::Int64, t::Int64, O::Vector{UInt8}, hmm::HMM)
-    if O[t] == 6
-        return 1.0
-    else
-        #BM: Changed denom to 5 to avoid "cheating" with gaps.
-        #We might want to have a separate "indel" rate though.
-        return O[t] == hmm.S[ref_index(i, hmm), t] ? 1 - hmm.mutation_probabilities[mutationrate_index(i, hmm)] : hmm.mutation_probabilities[mutationrate_index(i, hmm)] / 5
+# calculate all observation probabilities for an observation vector
+# uses more memory but a bit less time than a function
+function get_bs(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_probabilities::Vector{Float64})
+    b = Matrix{Float64}(undef, hmm.N, hmm.L)
+    @inbounds for i in 1:hmm.N
+        same_obs_prob = 1 - mutation_probabilities[i]
+        diff_obs_prob = mutation_probabilities[i] / 5
+        for j in 1:hmm.L
+            hmm_obs = hmm.S[i, j]
+            if O[j] == 6
+                prob = 1
+            elseif hmm_obs == O[j]
+                prob = same_obs_prob
+            else
+                prob = diff_obs_prob
+            end
+            b[i, j] = prob
+        end
     end
+    return b
 end
 
-# symbol_observation_probability with mutation_probabilities factored out of the hmm to allow multiple threads to use the same hmm
-function b(i::Int64, t::Int64, O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64})
-    if O[t] == 6
-        return 1.0
-    else
-        #BM: Changed denom to 5 to avoid "cheating" with gaps.
-        #We might want to have a separate "indel" rate though.
-        return O[t] == hmm.S[ref_index(i, hmm), t] ? 1 - mutation_probabilities[mutationrate_index(i, hmm)] : mutation_probabilities[mutationrate_index(i, hmm)] / 5
+function get_bs(hmm::FullHMM, O::Vector{UInt8}, mutation_probabilities::Vector{Float64})
+    b = Matrix{Float64}(undef, hmm.n * hmm.K, hmm.L)
+    @inbounds for i in 1:hmm.K # mutation rates
+        same_obs_prob = 1 - mutation_probabilities[i]
+        diff_obs_prob = mutation_probabilities[i] / 5
+        for j in 1:hmm.n # references
+            ind = (i - 1) * hmm.n + j
+            for k in 1:hmm.L # timepoints
+                hmm_obs = hmm.S[j, k]
+                obs = O[k]
+                b[ind, k] = if obs == 6
+                    1.0
+                elseif hmm_obs == obs
+                    same_obs_prob
+                else
+                    diff_obs_prob
+                end
+            end
+        end
     end
+    return b
 end
