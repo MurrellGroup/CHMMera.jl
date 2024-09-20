@@ -6,8 +6,6 @@ struct ApproximateHMM <: HMM
     N::Int64 # Number of states (equal to number of reference sequences)
     L::Int64 # Length of reference sequences
     S::Matrix{UInt8} # Reference sequences
-
-#    mutation_probabilities::Vector{Float64} # Mutation rate for each reference sequence - each ref has it's own mutation rate.
     switch_probability::Float64 # Probability of switching to a different reference sequence
 end
 
@@ -15,7 +13,6 @@ function ApproximateHMM(references::Matrix{UInt8}, base_mutation_probability::Fl
     N = length(references[:, 1])
     L = length(references[1, :])
     S = references
-#   mutation_probabilities = [base_mutation_probability for i in 1:N]
     switch_probability = chimera_prior_probability / L
     return ApproximateHMM(N, L, S, switch_probability)
 end
@@ -26,7 +23,6 @@ struct FullHMM <: HMM
     L::Int64 # Length of reference sequences
     K::Int64 # Number of mutation rates
     S::Matrix{Float64} # Reference sequences
-#    mutation_probabilities::Vector{Float64} # Each reference has K copies, each with a different mutation rate.
     switch_probability::Float64 # Probability of switching to a different reference sequence at each site.
 end
 
@@ -37,7 +33,6 @@ function FullHMM(references::Matrix{UInt8}, mutation_probabilities::Vector{Float
     L = length(references[1, :])
     S = references
     switch_probability = chimera_prior_probability / L
-#    return FullHMM(N, n, L, K, S, mutation_probabilities, switch_probability)
     return FullHMM(N, n, L, K, S, switch_probability)
 end
 

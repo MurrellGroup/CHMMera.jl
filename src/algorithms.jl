@@ -2,28 +2,28 @@ function chimeraprobability(O::Vector{UInt8}, hmm::T, mutation_probabilities::Ve
     b = get_bs(hmm, O, mutation_probabilities)
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
     b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
-    return forward(O, hmm, mutation_probabilities::Vector{Float64}, b)
+    return forward(hmm, b)
 end
 
 function findrecombinations(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
     b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
-    return viterbi(O, hmm, mutation_probabilities, b)
+    return viterbi(hmm, b)
 end
 
 function findrecombinations_and_startingpoint(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
     b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
-    return viterbi(O, hmm, mutation_probabilities, b)
+    return viterbi(hmm, b)
 end
 
 function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
     T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
     b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
-    recombs, startingpoint = viterbi(O, hmm, mutation_probabilities, b)
+    recombs, startingpoint = viterbi(hmm, b)
     if isempty(recombs)
         return (recombinations = recombs, startingpoint = startingpoint, pathevaluation = 0.0)
     end
@@ -32,10 +32,10 @@ function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{UInt8
     c = Vector{Float64}(undef, hmm.L)
     # forward
     alpha = Matrix{Float64}(undef, hmm.N, hmm.L)
-    forward!(alpha, c, O, hmm, mutation_probabilities, b)
+    forward!(alpha, c, hmm, b)
     # backward
     beta = Matrix{Float64}(undef, hmm.N, hmm.L)
-    backward!(beta, c, O, hmm, mutation_probabilities, b)
+    backward!(beta, c, hmm, b)
 
     # Normalized log probability of being at each position, (state_index, site_index)
     logp_position = Matrix{Float64}(undef, hmm.N, hmm.L)
@@ -76,8 +76,8 @@ function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), 
     alpha = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
-    forward!(alpha, c, O, hmm, mutation_probabilities, b)
-    backward!(beta, c, O, hmm, mutation_probabilities, b)
+    forward!(alpha, c, hmm, b)
+    backward!(beta, c, hmm, b)
     sort!(recombs, by = x -> x.position)
     log_probability = Array{Float64}(undef, hmm.L)
     i = 1
@@ -97,8 +97,8 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_pr
     alpha = Array{Float64}(undef, hmm.N, hmm.L)
     beta = Array{Float64}(undef, hmm.N, hmm.L)
     c = Array{Float64}(undef, hmm.L)
-    forward!(alpha, c, O, hmm, mutation_probabilities, b)
-    backward!(beta, c, O, hmm, mutation_probabilities, b)
+    forward!(alpha, c, hmm, b)
+    backward!(beta, c, hmm, b)
 	Nmut = fill(2.0, hmm.N) # pseudocount prior
     Nsame = fill(10.0, hmm.N) # pseudocount prior
 
@@ -124,7 +124,7 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_pr
     mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)	
 end
 
-function forward(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64}, b::Matrix{Float64})
+function forward(hmm::HMM, b::Matrix{Float64})
     alpha = Matrix{Float64}(undef, 2, hmm.N)
     a_false = a(false, hmm)
     a_true = a(true, hmm)
@@ -158,10 +158,10 @@ function forward(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Floa
     end
 
     detec = sum(view(alpha, 2, :))
-    return detec / (sum(view(alpha, 1, :)) + detec) #sum(alpha[2, :]) / sum(alpha)
+    return detec / (sum(view(alpha, 1, :)) + detec)
 end
 
-function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64}, b::Matrix{Float64})
+function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, hmm::HMM, b::Matrix{Float64})
     a_false = a(false, hmm)
     a_true = a(true, hmm)
 
@@ -184,7 +184,7 @@ function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, O::Vector{UInt8}, 
     end
 end
 
-function backward!(beta::Matrix{Float64}, c::Vector{Float64}, O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64}, b::Matrix{Float64})
+function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::HMM, b::Matrix{Float64})
     a_false = a(false, hmm)
     a_true = a(true, hmm)
 
@@ -213,10 +213,10 @@ function chimerapathevaluation(O::Vector{UInt8}, hmm::T, mutation_probabilities:
     c = Vector{Float64}(undef, hmm.L)
     # forward
     alpha = Matrix{Float64}(undef, hmm.N, hmm.L)
-    forward!(alpha, c, O, hmm, mutation_probabilities, b)
+    forward!(alpha, c, hmm, b)
     # backward
     beta = Matrix{Float64}(undef, hmm.N, hmm.L)
-    backward!(beta, c, O, hmm, mutation_probabilities, b)
+    backward!(beta, c, hmm, b)
 
     # Normalized log probability of being at each position, (state_index, site_index)
     logp_position = Matrix{Float64}(undef, hmm.N, hmm.L)
@@ -242,7 +242,7 @@ function chimerapathevaluation(O::Vector{UInt8}, hmm::T, mutation_probabilities:
     return probability_of_2nd_most_probable_ref
 end
 
-function viterbi(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Float64}, b::Matrix{Float64})
+function viterbi(hmm::HMM, b::Matrix{Float64})
     log_b = log.(b)
     phi = Array{Float64}(undef, hmm.N)
     from = Array{Int64}(undef, hmm.N, hmm.L)
@@ -278,4 +278,3 @@ function viterbi(O::Vector{UInt8}, hmm::HMM, mutation_probabilities::Vector{Floa
     sort!(recombinations, by = x -> x.at)
     return (recombinations = recombinations, startingpoint = ref_index(cur, hmm), pathevaluation = -1)
 end
-

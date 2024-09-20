@@ -1,12 +1,10 @@
 # For algorithms
-
 function maxtwo(arr::Vector{T}) where T<:Number
     indices = partialsortperm(arr, 1:2, rev=true)
     return collect(zip(indices, arr[indices]))
 end
 
 # For interface
-
 function as_string(seq::Vector{UInt8})
     mymap = ["A", "C", "G", "T", "-", "N"]
     return join((mymap[nt] for nt in seq))
@@ -21,7 +19,6 @@ const NUC2INT = (
     'N' => 0x06
 )
 
-# lookup tables are faster than dicts
 const NUC2INT_LOOKUP = let
     table = fill(0x06, 256) 
     for (k, v) in NUC2INT
@@ -29,7 +26,6 @@ const NUC2INT_LOOKUP = let
     end
     tuple(table...) 
 end
-
 
 function as_ints(seq::String)
     ints = Vector{UInt8}(undef, length(seq))
