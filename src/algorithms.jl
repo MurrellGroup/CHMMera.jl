@@ -45,7 +45,7 @@ function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{UInt8
     end
 
     # p_ref[i] = the probability of being at ref[i] at the time t, for the t that maximizes this probability, where t ∈ {t : viterbi_path[t] == ref[i]}
-    p_ref = Dict(union([startingpoint => 0.0], [recomb.to => 0.0 for recomb in recombs]))
+    p_ref = Dict(union([startingpoint => 0.0], [recomb.right => 0.0 for recomb in recombs]))
 
     cur = startingpoint
     recombindex = 1
@@ -54,7 +54,7 @@ function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{UInt8
         # exp(logp_position[i, t]) should not underflow here, since we are iterating over the path with the highest (log)probability
         p_ref[cur] = max(sum( exp(logp_position[i, t]) for i in stateindicesofref(cur, hmm) ), p_ref[cur])
         if recombindex <= length(recombs) && t == recombs[recombindex].position
-            cur = recombs[recombindex].to
+            cur = recombs[recombindex].right
             recombindex += 1
         end
     end
@@ -64,7 +64,7 @@ function findrecombinations_and_startingpoint_and_pathevaulation(O::Vector{UInt8
 end
 
 
-function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
+function logsiteprobabilities(recombs::Vector{NamedTuple{(:position, :left, :right), Tuple{Int64, Int64, Int64}}}, O::Vector{Int}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     # length(recombs) > 0 || "No recombinations found, can only be run on chimeric sequences"
     if length(recombs) == 0
         return zeros(Float64, length(O))
@@ -121,7 +121,7 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_pr
             end
         end
     end
-    mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)	
+    mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)
 end
 
 function forward(hmm::HMM, b::Matrix{Float64})
@@ -224,7 +224,7 @@ function chimerapathevaluation(O::Vector{UInt8}, hmm::T, mutation_probabilities:
         p_position = alpha[:, t] .* beta[:, t] # unnormalized
         logp_position[:, t] = log.(p_position) .- log(sum(p_position)) # log normalized
     end
-    p_ref = Dict(union([startingpoint => 0.0], [recomb.to => 0.0 for recomb in recombs]))
+    p_ref = Dict(union([startingpoint => 0.0], [recomb.left => 0.0 for recomb in recombs]))
 
     cur = startingpoint
     recombindex = 1
@@ -266,15 +266,15 @@ function viterbi(hmm::HMM, b::Matrix{Float64})
         end
     end
     cur = argmax(phi)
-    recombinations = NamedTuple{(:position, :at, :to), Tuple{Int64, Int64, Int64}}[]
+    recombinations = NamedTuple{(:position, :left, :right), Tuple{Int64, Int64, Int64}}[]
     @inbounds @simd for t in hmm.L:-1:1
         if cur != from[cur, t]
             if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
-                push!(recombinations, (position=t-1, at=ref_index(from[cur, t], hmm), to=ref_index(cur, hmm)))
+                push!(recombinations, (position=t, left=ref_index(from[cur, t], hmm), right=ref_index(cur, hmm)))
             end
             cur = from[cur, t]
         end
     end
-    sort!(recombinations, by = x -> x.at)
+    sort!(recombinations, by = x -> x.position)
     return (recombinations = recombinations, startingpoint = ref_index(cur, hmm), pathevaluation = -1)
 end

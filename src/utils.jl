@@ -1,15 +1,3 @@
-# For algorithms
-function maxtwo(arr::Vector{T}) where T<:Number
-    indices = partialsortperm(arr, 1:2, rev=true)
-    return collect(zip(indices, arr[indices]))
-end
-
-# For interface
-function as_string(seq::Vector{UInt8})
-    mymap = ["A", "C", "G", "T", "-", "N"]
-    return join((mymap[nt] for nt in seq))
-end
-
 const NUC2INT = (
     'A' => 0x01,
     'C' => 0x02,
@@ -20,11 +8,11 @@ const NUC2INT = (
 )
 
 const NUC2INT_LOOKUP = let
-    table = fill(0x06, 256) 
+    table = fill(0x06, 256)
     for (k, v) in NUC2INT
         table[Int(k)] = v
     end
-    tuple(table...) 
+    tuple(table...)
 end
 
 function as_ints(seq::String)

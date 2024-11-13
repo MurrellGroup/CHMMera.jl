@@ -9,7 +9,7 @@ struct ApproximateHMM <: HMM
     switch_probability::Float64 # Probability of switching to a different reference sequence
 end
 
-function ApproximateHMM(references::Matrix{UInt8}, base_mutation_probability::Float64, chimera_prior_probability::Float64)
+function ApproximateHMM(references::Matrix{UInt8}, chimera_prior_probability::Float64)
     N = length(references[:, 1])
     L = length(references[1, :])
     S = references
@@ -51,10 +51,10 @@ a(samestate::Bool, hmm::HMM) = samestate ? 1 - hmm.switch_probability : hmm.swit
 # uses more memory but a bit less time than a function
 function get_bs(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_probabilities::Vector{Float64})
     b = Matrix{Float64}(undef, hmm.N, hmm.L)
-    @inbounds for i in 1:hmm.N
+    @inbounds for i in 1:hmm.N # states (reference sequences) 
         same_obs_prob = 1 - mutation_probabilities[i]
         diff_obs_prob = mutation_probabilities[i] / 5
-        for j in 1:hmm.L
+        for j in 1:hmm.L # timepoints
             hmm_obs = hmm.S[i, j]
             if O[j] == 6
                 prob = 1
@@ -71,11 +71,12 @@ end
 
 function get_bs(hmm::FullHMM, O::Vector{UInt8}, mutation_probabilities::Vector{Float64})
     b = Matrix{Float64}(undef, hmm.n * hmm.K, hmm.L)
+    ref2stateindices = stateindicesofref.(1:hmm.n, Ref(hmm))
     @inbounds for i in 1:hmm.K # mutation rates
         same_obs_prob = 1 - mutation_probabilities[i]
         diff_obs_prob = mutation_probabilities[i] / 5
         for j in 1:hmm.n # references
-            ind = (i - 1) * hmm.n + j
+            ind = ref2stateindices[j][i]
             for k in 1:hmm.L # timepoints
                 hmm_obs = hmm.S[j, k]
                 obs = O[k]
