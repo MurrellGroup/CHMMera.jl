@@ -57,18 +57,32 @@ using Test
         # Recombinant sequence (CCCAAA) should have recombination events
         # We should get the same results for Baum-Welch and Discrete Bayesian
         # Baum-Welch
-        recombination_events = CHMMera.get_recombination_events(queries, references, true, [0.0], 0.05, 0.04, true, true)
+        recombination_events = CHMMera.get_recombination_events(queries, references, true, [0.0], 0.05, 0.04, true)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
         @test recombination_events[2].recombinations == [(position = 4, left = 2, right = 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.99
+
+        # run without path evaluation/starting point
+        recombination_events = CHMMera.get_recombination_events(queries, references, true, [0.0], 0.05, 0.04, false)
+        @test recombination_events[1].recombinations == []
+        @test recombination_events[1].startingpoint == 1
+        @test recombination_events[2].recombinations == [(position = 4, left = 2, right = 1)]
+
         # Discrete Bayesian
-        recombination_events = CHMMera.get_recombination_events(queries, references, false, [0.01, 0.05, 0.1], 0.05, 0.04, true, true)
+        recombination_events = CHMMera.get_recombination_events(queries, references, false, [0.01, 0.05, 0.1], 0.05, 0.04, true)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
         @test recombination_events[2].recombinations == [(position = 4, left = 2, right = 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.99
+
+        # logsiteprobabilities
+        recombinations = CHMMera.get_log_site_probabilities(queries, references, true, [0.0], 0.05, 0.04)
+        @test all(recombinations[1] .== 0.0)
+        @test all(exp.(recombinations[2][1:3]) .> 0.9) 
+        @test all(exp.(recombinations[2][4:6]) .< 0.1) # path evaluation decreases after switch due to transition probability
+
     end
 end
