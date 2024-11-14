@@ -51,7 +51,7 @@ a(samestate::Bool, hmm::HMM) = samestate ? 1 - hmm.switch_probability : hmm.swit
 # uses more memory but a bit less time than a function
 function get_bs(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_probabilities::Vector{Float64})
     b = Matrix{Float64}(undef, hmm.N, hmm.L)
-    @inbounds for i in 1:hmm.N # states (reference sequences) 
+    @inbounds for i in 1:hmm.N # states (reference sequences)
         same_obs_prob = 1 - mutation_probabilities[i]
         diff_obs_prob = mutation_probabilities[i] / 5
         for j in 1:hmm.L # timepoints

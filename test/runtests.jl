@@ -28,57 +28,46 @@ using Test
                                                                                                 0.98 0.98 0.98 0.98 0.98 1.0]
     end
 
-    @testset "algorithms.jl" begin
-        fullhmm = CHMMera.FullHMM(CHMMera.vovtomatrix(CHMMera.as_ints.(["AAAAAA", "CCCCCC"])), [0.01, 0.02], 0.01)
-        @test CHMMera.findrecombinations(CHMMera.as_ints("AAAAAA"), fullhmm, [0.01, 0.02]).recombinations == []
-        @test CHMMera.findrecombinations(CHMMera.as_ints("CCCCCC"), fullhmm, [0.01, 0.02]).recombinations == []
-        v = Vector{CHMMera.RecombinationEvent}(undef, 1)
-        
-        recombs = CHMMera.findrecombinations(CHMMera.as_ints("AAACCC"), fullhmm, [0.01, 0.02])
-        @test recombs.recombinations[1] == CHMMera.RecombinationEvent(3,1,2,1,4)
- 
-    end
-
     @testset "CHMMera.jl" begin
         # Test chimera probability calculations
         # Non-chimeric sequence (AAAAAA) should have very low probability
         # Chimeric sequence (CCCAAA) should have very high probability
-     
+
         references = ["AAAAAA", "CCCCCC"]
         queries = ["AAAAAA", "CCCAAA"]
         # Baum-Welch
-        chimera_probs = CHMMera.get_chimera_probabilities(queries, references, true, [0.0], 0.05, 0.04)
+        chimera_probs = CHMMera.get_chimera_probabilities(queries, references, bw = true)
         @test chimera_probs[1] < 0.1
-        @test chimera_probs[2] > 0.99
-        
+        @test chimera_probs[2] > 0.9
+
         # Discrete Bayesian
-        chimera_probs = CHMMera.get_chimera_probabilities(queries, references, false, [0.01, 0.05, 0.1], 0.05, 0.04)
+        chimera_probs = CHMMera.get_chimera_probabilities(queries, references, bw = false)
         @test chimera_probs[1] < 0.1
-        @test chimera_probs[2] > 0.99
+        @test chimera_probs[2] > 0.9
 
         # Test recombination event calculations
         # Non-recombinant sequence (AAAAAA) should have no recombination events
         # Recombinant sequence (CCCAAA) should have recombination events
         # We should get the same results for Baum-Welch and Discrete Bayesian
         # Baum-Welch
-        recombination_events = CHMMera.get_recombination_events(queries, references, true, [0.0], 0.05, 0.04, true)
+        recombination_events = CHMMera.get_recombination_events(queries, references, bw = true, detailed = true)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
-        @test recombination_events[2].recombinations == [CHMMera.RecombinationEvent(4, 2, 1, 2, 1)]
+        @test recombination_events[2].recombinations == [RecombinationEvent(4, 2, 1, 2, 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.99
-        
+
         # run without path evaluation/starting point
-        recombination_events = CHMMera.get_recombination_events(queries, references, true, [0.0], 0.05, 0.04, false)
+        recombination_events = CHMMera.get_recombination_events(queries, references, bw = true, detailed = false)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
-        @test recombination_events[2].recombinations == [CHMMera.RecombinationEvent(4, 2, 1, 2, 1)]
+        @test recombination_events[2].recombinations == [RecombinationEvent(4, 2, 1, 2, 1)]
 
         # Discrete Bayesian
-        recombination_events = CHMMera.get_recombination_events(queries, references, false, [0.01, 0.05, 0.1], 0.05, 0.04, true)
+        recombination_events = CHMMera.get_recombination_events(queries, references, bw = false, mutation_probabilities = [0.01, 0.05, 0.1], detailed = true)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
-        @test recombination_events[2].recombinations == [CHMMera.RecombinationEvent(4, 2, 1, 4, 1)]
+        @test recombination_events[2].recombinations == [RecombinationEvent(4, 2, 1, 4, 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.99
     end

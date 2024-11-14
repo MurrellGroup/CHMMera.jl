@@ -11,10 +11,21 @@ end
 
 struct RecombinationEvents
     recombinations::Vector{RecombinationEvent}
-    startingpoint::Union{Int64, Missing}
-    pathevaluation::Union{Float64, Missing}
-    logsiteprobabilities::Union{Vector{Float64}, Missing}
+    startingpoint::Int64
 end
+
+struct DetailedRecombinationEvents
+    recombinations::Vector{RecombinationEvent}
+    startingpoint::Int64
+    pathevaluation::Float64
+    logsiteprobabilities::Vector{Float64}
+end
+
+Base.show(io::IO, recomb::RecombinationEvents) = print(io, "(recombinations = $(recomb.recombinations), startingpoint = $(recomb.startingpoint))")
+
+Base.show(io::IO, recomb::DetailedRecombinationEvents) = print(io, "(recombinations = $(recomb.recombinations), startingpoint = $(recomb.startingpoint), pathevaluation = $(recomb.pathevaluation), logsiteprobabilities = $(recomb.logsiteprobabilities))")
+
+Base.show(io::IO, recomb::RecombinationEvent) = print(io, "(position = $(recomb.position), left = $(recomb.left), right = $(recomb.right), left_state = $(recomb.left_state), right_state = $(recomb.right_state))")
 
 function chimeraprobability(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
@@ -36,7 +47,7 @@ function findrecombinations_detailed(O::Vector{UInt8}, hmm::T, mutation_probabil
     b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
     recombs = viterbi(hmm, b)
     if length(recombs.recombinations) == 0
-        return recombs
+        return DetailedRecombinationEvents(recombs.recombinations, recombs.startingpoint, -Inf, [])
     end
 
     # scaling constants
@@ -72,12 +83,12 @@ function findrecombinations_detailed(O::Vector{UInt8}, hmm::T, mutation_probabil
 
     probability_of_2nd_most_probable_ref = sort(collect(values(p_ref)))[end - 1]
     logsiteprobabilities_ = logsiteprobabilities(recombs, O, hmm, b)
-    return RecombinationEvents(recombs.recombinations, recombs.startingpoint, probability_of_2nd_most_probable_ref, logsiteprobabilities_)
+    return DetailedRecombinationEvents(recombs.recombinations, recombs.startingpoint, probability_of_2nd_most_probable_ref, logsiteprobabilities_)
 end
 
 
-function logsiteprobabilities(recombs::RecombinationEvents, 
-                            O::Vector{UInt8}, 
+function logsiteprobabilities(recombs::RecombinationEvents,
+                            O::Vector{UInt8},
                             hmm::T,
                             b::Matrix{Float64}) where T <: HMM
     # length(recombs) > 0 || "No recombinations found, can only be run on chimeric sequences"
@@ -247,5 +258,5 @@ function viterbi(hmm::HMM, b::Matrix{Float64})
         end
     end
     sort!(recombinations, by = x -> x.position)
-    return RecombinationEvents(recombinations, ref_index(cur, hmm), missing, missing)
-end 
+    return RecombinationEvents(recombinations, ref_index(cur, hmm))
+end

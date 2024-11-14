@@ -2,11 +2,17 @@ using Documenter
 using CHMMera
 
 makedocs(
-    sitename = "CHMMera",
+    sitename = "CHMMera.jl",
     format = Documenter.HTML(),
     modules = [CHMMera],
     pages = [
-        "Home" => "index.md",
+        "Overview" => "index.md",
         "API" => "api.md",
     ]
+)
+
+deploydocs(
+    repo = "github.com/MurrellGroup/CHMMera.jl.git",
+    devbranch = "main",
+    push_preview = true
 )
