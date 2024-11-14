@@ -1,5 +1,8 @@
 # CHMMera.jl
 
+[![MIT license](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/license/MIT)
+[![Coverage](https://codecov.io/gh/MurrellGroup/CHMMera.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/MurrellGroup/CHMMera.jl)
+
 CHMMera.jl is a method for reference-based detection of chimeric DNA sequences.
 
 Chimera detection is performed using a Hidden Markov Model (HMM) that models sequences as being generated from a single reference with mutations or from multiple references with mutations. We implemented two approaches to determine mutation rates:
