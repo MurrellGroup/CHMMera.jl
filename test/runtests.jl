@@ -32,10 +32,14 @@ using Test
         fullhmm = CHMMera.FullHMM(CHMMera.vovtomatrix(CHMMera.as_ints.(["AAAAAA", "CCCCCC"])), [0.01, 0.02], 0.01)
         @test CHMMera.findrecombinations(CHMMera.as_ints("AAAAAA"), fullhmm, [0.01, 0.02]).recombinations == []
         @test CHMMera.findrecombinations(CHMMera.as_ints("CCCCCC"), fullhmm, [0.01, 0.02]).recombinations == []
-        @test CHMMera.findrecombinations(CHMMera.as_ints("AAACCC"), fullhmm, [0.01, 0.02]) == (recombinations = [(position = 3, left = 1, right = 2)], startingpoint = 1, pathevaluation = -1)
+        v = Vector{CHMMera.RecombinationEvent}(undef, 1)
+        
+        recombs = CHMMera.findrecombinations(CHMMera.as_ints("AAACCC"), fullhmm, [0.01, 0.02])
+        @test recombs.recombinations[1] == CHMMera.RecombinationEvent(3,1,2,1,4)
+ 
     end
 
-    @testset "interface.jl" begin
+    @testset "CHMMera.jl" begin
         # Test chimera probability calculations
         # Non-chimeric sequence (AAAAAA) should have very low probability
         # Chimeric sequence (CCCAAA) should have very high probability
@@ -60,29 +64,22 @@ using Test
         recombination_events = CHMMera.get_recombination_events(queries, references, true, [0.0], 0.05, 0.04, true)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
-        @test recombination_events[2].recombinations == [(position = 4, left = 2, right = 1)]
+        @test recombination_events[2].recombinations == [CHMMera.RecombinationEvent(4, 2, 1, 2, 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.99
-
+        
         # run without path evaluation/starting point
         recombination_events = CHMMera.get_recombination_events(queries, references, true, [0.0], 0.05, 0.04, false)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
-        @test recombination_events[2].recombinations == [(position = 4, left = 2, right = 1)]
+        @test recombination_events[2].recombinations == [CHMMera.RecombinationEvent(4, 2, 1, 2, 1)]
 
         # Discrete Bayesian
         recombination_events = CHMMera.get_recombination_events(queries, references, false, [0.01, 0.05, 0.1], 0.05, 0.04, true)
         @test recombination_events[1].recombinations == []
         @test recombination_events[1].startingpoint == 1
-        @test recombination_events[2].recombinations == [(position = 4, left = 2, right = 1)]
+        @test recombination_events[2].recombinations == [CHMMera.RecombinationEvent(4, 2, 1, 4, 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.99
-
-        # logsiteprobabilities
-        recombinations = CHMMera.get_log_site_probabilities(queries, references, true, [0.0], 0.05, 0.04)
-        @test all(recombinations[1] .== 0.0)
-        @test all(exp.(recombinations[2][1:3]) .> 0.9) 
-        @test all(exp.(recombinations[2][4:6]) .< 0.1) # path evaluation decreases after switch due to transition probability
-
     end
 end

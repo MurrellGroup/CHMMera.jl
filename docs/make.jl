@@ -1,6 +1,12 @@
-using Documenter, CHMMera
+using Documenter
+using CHMMera
 
-makedocs(sitename="CHMMera")
-deploydocs(
-    repo = "https://github.com/MurrellGroup/CHMMera"
+makedocs(
+    sitename = "CHMMera",
+    format = Documenter.HTML(),
+    modules = [CHMMera],
+    pages = [
+        "Home" => "index.md",
+        "API" => "api.md",
+    ]
 )
