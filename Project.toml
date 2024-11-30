@@ -1,7 +1,7 @@
 name = "CHMMera"
 uuid = "4c20a592-b4de-41d1-8706-b02f346981aa"
 authors = ["aronStalmarck <aron.stalmarck@gmail.com> and contributors"]
-version = "0.1.0"
+version = "0.1.1"
 
 [compat]
 julia = "1.6"
