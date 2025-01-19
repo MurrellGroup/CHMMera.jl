@@ -24,16 +24,17 @@ struct FullHMM <: HMM
     K::Int64 # Number of mutation rates
     S::Matrix{UInt8} # Reference sequences
     switch_probability::Float64 # Probability of switching to a different reference sequence at each site.
+    μ::Float64
 end
 
-function FullHMM(references::Matrix{UInt8}, mutation_probabilities::Vector{Float64}, chimera_prior_probability::Float64)
+function FullHMM(references::Matrix{UInt8}, mutation_probabilities::Vector{Float64}, chimera_prior_probability::Float64, mutation_switch_probability::Float64 = zero(Float64))
     K = length(mutation_probabilities)
     n = length(references[:, 1])
     N = n * K
     L = length(references[1, :])
     S = references
     switch_probability = chimera_prior_probability / L
-    return FullHMM(N, n, L, K, S, switch_probability)
+    return FullHMM(N, n, L, K, S, switch_probability, mutation_switch_probability)
 end
 
 ref_index(state_index::Int64, hmm::FullHMM) = div(state_index - 1, hmm.K) + 1
