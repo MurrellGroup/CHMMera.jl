@@ -16,11 +16,9 @@ function get_chimera_probabilities(device::Function, queries::Vector{Vector{UInt
     mutation_probabilities = bw ? [base_mutation_probability for i in 1:length(references)] : mutation_probabilities
     chimera_probabiltiies = zeros(length(queries))
     # split query iteration among threads
-    i = firstindex(queries)
-    while i <= lastindex(queries)
+    Threads.@threads for i in 1:batchsize:lastindex(queries)
         j = min(i + batchsize - 1, lastindex(queries))
         chimera_probabiltiies[i:j] .= chimeraprobability(device, queries[i:j], hmm, copy(mutation_probabilities))
-        i = j + 1
     end
     return chimera_probabiltiies
 end
