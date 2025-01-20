@@ -271,18 +271,13 @@ end
 
 
 #----- FullHMM algorithms -----#
-#=
-TODO
-
-What if hmm.K == 1?
-=#
 function forward(hmm::FullHMM, b::Matrix{Float64})
     alpha = Matrix{Float64}(undef, 2, hmm.N)
     init_state = initialstate(hmm)
 
     a_self = 1 - hmm.switch_probability - hmm.μ
     a_diffref = hmm.switch_probability / ((hmm.n - 1) * hmm.K)
-    a_diffmut = hmm.μ / (hmm.K - 1)
+    a_diffmut = hmm.K == 1 ? 0.0 : hmm.μ / (hmm.K - 1)
 
     for i in 1:hmm.N
         alpha[1, i] = init_state * b[i, 1]
@@ -322,7 +317,7 @@ end
 function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::Matrix{Float64})
     a_self = 1 - hmm.switch_probability - hmm.μ
     a_diffref = hmm.switch_probability / ((hmm.n - 1) * hmm.K)
-    a_diffmut = hmm.μ / (hmm.K - 1)
+    a_diffmut = hmm.K == 1 ? 0.0 : hmm.μ / (hmm.K - 1)
 
     c[1] = 1
     for i in 1:hmm.N
@@ -348,7 +343,7 @@ end
 function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::Matrix{Float64})
     a_self = 1 - hmm.switch_probability - hmm.μ
     a_diffref = hmm.switch_probability / ((hmm.n - 1) * hmm.K)
-    a_diffmut = hmm.μ / (hmm.K - 1)
+    a_diffmut = hmm.K == 1 ? 0.0 : hmm.μ / (hmm.K - 1)
 
     beta[:, hmm.L] .= c[hmm.L]
     for t in hmm.L-1:-1:1
@@ -380,7 +375,7 @@ function viterbi(hmm::FullHMM, b::Matrix{Float64})
 
     log_a_self = log(1 - hmm.switch_probability - hmm.μ)
     log_a_diffref = log(hmm.switch_probability / ((hmm.n - 1) * hmm.K))
-    log_a_diffmut = log(hmm.μ / (hmm.K - 1))
+    log_a_diffmut = hmm.K == 1 ? -Inf64 : log(hmm.μ / (hmm.K - 1))
     for t in 1:hmm.L-1
         phi_order = sortperm(phi)
         for ref in 1:hmm.n
