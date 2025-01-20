@@ -75,7 +75,7 @@ function findrecombinations_detailed(O::Vector{UInt8}, hmm::T, mutation_probabil
         # For the fullbayesian version, each reference has multiple states, hence why we use stateindicesofref
         # exp(logp_position[i, t]) should not underflow here, since we are iterating over the path with the highest (log)probability
         p_ref[cur] = max(sum( exp(logp_position[i, t]) for i in stateindicesofref(cur, hmm) ), p_ref[cur])
-        if recombindex <= length(recombs.recombinations) && t == recombs.recombinations[recombindex].position
+        if recombindex <= length(recombs.recombinations) && t + 1 == recombs.recombinations[recombindex].position
             cur = recombs.recombinations[recombindex].right
             recombindex += 1
         end
@@ -354,7 +354,7 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::M
     for t in hmm.L-1:-1:1
         sumbeta = 0.0
         for j in 1:hmm.N
-            sumbeta += beta[j, t+1]*b[j, t+1]
+            sumbeta += beta[j, t+1]
         end
 
         for ref in 1:hmm.n
@@ -363,8 +363,8 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::M
             for i in states
                 beta[i, t] = (a_self * beta[i, t+1] + a_diffmut * (sumstates - beta[i, t+1]) + a_diffref * (sumbeta - sumstates)) * b[i, t+1]
             end
-            beta[:, t] .*= c[t]
         end
+        beta[:, t] .*= c[t]
     end
 end
 
