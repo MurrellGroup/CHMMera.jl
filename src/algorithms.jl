@@ -29,22 +29,22 @@ Base.show(io::IO, recomb::RecombinationEvent) = print(io, "(position = $(recomb.
 
 function chimeraprobability(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
-    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
-    b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
+    hmm isa ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
+    b = hmm isa ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
     return forward(hmm, b)
 end
 
 function findrecombinations(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
-    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
-    b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
+    hmm isa ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
+    b = hmm isa ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
     return viterbi(hmm, b)
 end
 
 function findrecombinations_detailed(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
-    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
-    b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
+    hmm isa ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
+    b = hmm isa ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
     recombs = viterbi(hmm, b)
     if length(recombs.recombinations) == 0
         return DetailedRecombinationEvents(recombs.recombinations, recombs.startingpoint, -Inf, [])
