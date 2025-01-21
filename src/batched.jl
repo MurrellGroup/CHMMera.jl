@@ -25,14 +25,14 @@ end
 
 # ==== Batched hmm.jl ==== # 
 function batched_get_bs(hmm::FullHMM, O::AbstractMatrix, mutation_probabilities::AbstractVector)
-    b = similar(O, Float32, hmm.n, hmm.K, hmm.L, size(O, 2))
+    b = similar(O, Float32, hmm.n, hmm.K, size(O, 1), hmm.L)
     S = similar(O, UInt32, size(hmm.S)...)
     copy!(S, UInt32.(hmm.S))
     @inbounds for mut in 1:hmm.K # mutation rates
         same_obs_prob = Float32(1 .- mutation_probabilities[mut])
         diff_obs_prob = Float32(mutation_probabilities[mut] ./ 3)
         for ref in 1:hmm.n # references
-            b[ref, mut, :, :] .= get_b.(S[ref, :], O, same_obs_prob, diff_obs_prob)
+            b[ref, mut, :, :] .= get_b.(reshape(S[ref, :], 1, :), O, same_obs_prob, diff_obs_prob)
         end
     end
     return b
@@ -52,7 +52,7 @@ end
 
 # ==== Batched algorithms.jl ==== #
 function chimeraprobability(device::Function, O::Vector{Vector{UInt8}}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: FullHMM
-    O = device(UInt32.(cat(O..., dims=2)))
+    O = device(UInt32.(vovtomatrix(O)))
     b = batched_get_bs(hmm, O, mutation_probabilities)
     #T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
     #b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
@@ -65,12 +65,12 @@ function forward(hmm::FullHMM, b::AbstractArray{T}) where T <: Real
     a_diffref = T(hmm.switch_probability / ((hmm.n - 1) * hmm.K))
     a_diffmut = hmm.K == 1 ? zero(T) : T(hmm.μ / (hmm.K - 1))
 
-    b = reshape(b, size(b)[1:3]..., :)
-    batchdim = size(b, 4)
+    #b = reshape(b, size(b)[1:3]..., :)
+    batchdim = size(b, 3)
 
     alpha = similar(b, 2, hmm.n, hmm.K, batchdim)
 
-    alpha[1, :, :, :] .= T(initialstate(hmm)) .* b[:, :, 1, :]
+    alpha[1, :, :, :] .= T(initialstate(hmm)) .* b[:, :, :, 1]
     alpha[2, :, :, :] .= zero(T)
 
     postchimera_mask = similar(alpha, 2, 1, 1, 1)
@@ -78,12 +78,11 @@ function forward(hmm::FullHMM, b::AbstractArray{T}) where T <: Real
     postchimera_mask[2, :, :, :] .= a_diffref
 
     for t in 1:hmm.L - 1
-        sumalpha = sum(alpha, dims = (1, 2, 3))
+        sumref = sum(alpha, dims=3)
+        sumref_tot = sum(sumref, dims=1)
+        sumalpha = sum(sumref_tot, dims=2)
 
-        sumref = sum(alpha, dims=(3))
-        sumref_tot = sum(alpha, dims=(1, 3))
-
-        alpha .= (alpha .* a_self .+ (sumref .- alpha) .* a_diffmut .+ (sumalpha .- sumref_tot) .* postchimera_mask) .* reshape(b[:, :, t+1, :], 1, hmm.n, hmm.K, :)
+        alpha .= (alpha .* a_self .+ (sumref .- alpha) .* a_diffmut .+ (sumalpha .- sumref_tot) .* postchimera_mask) .* reshape(b[:, :, :, t+1], 1, hmm.n, hmm.K, :)
 
         alpha ./= sum(alpha, dims=(1, 2, 3))
     end
