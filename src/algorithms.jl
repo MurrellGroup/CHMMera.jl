@@ -349,14 +349,14 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::M
     for t in hmm.L-1:-1:1
         sumbeta = 0.0
         for j in 1:hmm.N
-            sumbeta += beta[j, t+1]
+            sumbeta += beta[j, t+1] * b[j, t+1]
         end
 
         for ref in 1:hmm.n
             states = stateindicesofref(ref, hmm)
-            sumstates = sum(view(beta, states, t+1))
+            sumstates = sum(beta[states, t+1] .* b[states, t+1])
             for i in states
-                beta[i, t] = (a_self * beta[i, t+1] + a_diffmut * (sumstates - beta[i, t+1]) + a_diffref * (sumbeta - sumstates)) * b[i, t+1]
+                beta[i, t] = (a_self * beta[i, t+1] * b[i, t+1]) + (a_diffmut * (sumstates - beta[i, t+1] * b[i, t+1])) + (a_diffref * (sumbeta - sumstates))
             end
         end
         beta[:, t] .*= c[t]
