@@ -70,5 +70,13 @@ using Test
         @test recombination_events[2].recombinations == [RecombinationEvent(4, 2, 1, 4, 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.9
+
+        # k = 1
+        recombination_events = CHMMera.get_recombination_events(queries, references, bw = false, mutation_probabilities = [0.005], detailed = true)
+        @test recombination_events[1].recombinations == []
+        @test recombination_events[1].startingpoint == 1
+        @test recombination_events[2].recombinations == [RecombinationEvent(4, 2, 1, 2, 1)]
+        @test recombination_events[2].startingpoint == 2
+        @test recombination_events[2].pathevaluation > 0.9
     end
 end
