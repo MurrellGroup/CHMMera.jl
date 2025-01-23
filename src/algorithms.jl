@@ -364,6 +364,8 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::M
 end
 
 function viterbi(hmm::FullHMM, b::Matrix{Float64})
+    @assert hmm.K > 1
+
     log_b = log.(b)
     phi = Array{Float64}(undef, hmm.N)
     phi_nxt = Array{Float64}(undef, hmm.N)
@@ -381,7 +383,7 @@ function viterbi(hmm::FullHMM, b::Matrix{Float64})
         for ref in 1:hmm.n
             states = stateindicesofref(ref, hmm)
             argmax_diffref = phi_order[findlast(!∈(states), phi_order)]
-            states_ordered = sortperm(states; by = i -> phi[i])
+            states_ordered = sort(states; by = i -> phi[i])
             for j in states
                 argmax_diffmut = states_ordered[findlast(!=(j), states_ordered)]
 
