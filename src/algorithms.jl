@@ -364,7 +364,6 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::M
 end
 
 function viterbi(hmm::FullHMM, b::Matrix{Float64})
-    @assert hmm.K > 1
 
     log_b = log.(b)
     phi = Array{Float64}(undef, hmm.N)
@@ -385,10 +384,14 @@ function viterbi(hmm::FullHMM, b::Matrix{Float64})
             argmax_diffref = phi_order[findlast(!∈(states), phi_order)]
             states_ordered = sort(states; by = i -> phi[i])
             for j in states
-                argmax_diffmut = findlast(!=(j), states_ordered)
-
-                keys = (j, argmax_diffmut, argmax_diffref)
-                values = (phi[j] + log_a_self, phi[argmax_diffmut] + log_a_diffmut, phi[argmax_diffref] + log_a_diffref)
+                if hmm.K == 1
+                    keys = (j, argmax_diffref)
+                    values = (phi[j] + log_a_self, phi[argmax_diffref] + log_a_diffref)
+                else
+                    argmax_diffmut = findlast(!=(j), states_ordered)
+                    keys = (j, argmax_diffref, argmax_diffmut)
+                    values = (phi[j] + log_a_self, phi[argmax_diffref] + log_a_diffref, phi[argmax_diffmut] + log_a_diffmut)
+                end
                 choice = argmax(values)
                 from[j, t+1] = keys[choice]
                 phi_nxt[j] = values[choice] + log_b[j, t+1]
