@@ -159,8 +159,8 @@ function forward!(alpha::AbstractArray, c::AbstractMatrix, hmm::ApproximateHMM, 
 end
 
 function backward!(beta::AbstractArray, c::AbstractMatrix, hmm::ApproximateHMM, b::AbstractArray{T}) where T <: Real
-    a_false = a(false, hmm)
-    a_true = a(true, hmm)
+    a_false = T(a(false, hmm))
+    a_true = T(a(true, hmm))
 
     beta[:, :, hmm.L] .= reshape(c[:, hmm.L], 1, :)
     for t in hmm.L-1:-1:1
@@ -170,7 +170,7 @@ function backward!(beta::AbstractArray, c::AbstractMatrix, hmm::ApproximateHMM, 
     end
 end
 
-function parameterestimation!(hmm::ApproximateHMM, O::AbstractMatrix, mutation_probabilities::AbstractMatrix, b::AbstractArray{T}) where T <: Real
+function parameterestimation!(hmm::ApproximateHMM, O::AbstractMatrix{U}, mutation_probabilities::AbstractMatrix, b::AbstractArray{T}) where {U <: Unsigned, T <: Real}
     batchsize = size(O, 1)
     alpha = similar(b, hmm.N, batchsize, hmm.L)
     beta = similar(b, hmm.N, batchsize, hmm.L)
@@ -195,8 +195,8 @@ function parameterestimation!(hmm::ApproximateHMM, O::AbstractMatrix, mutation_p
         St = reshape(S[:, t], :, 1)
 
         # Ot.!= 6 to handle non-informative obs
-        Nmut .+= (Ot.!= T(6)) .* (Ot .!= St) .* alpha[:, :, t] .* beta[:, :, t] ./ sumC[:, :, t]
-        Nsame .+= (Ot .!= T(6)) .* (Ot .== St) .* alpha[:, :, t] .* beta[:, :, t] ./ sumC[:, :, t]
+        Nmut .+= (Ot .!= U(6)) .* (Ot .!= St) .* alpha[:, :, t] .* beta[:, :, t] ./ sumC[:, :, t]
+        Nsame .+= (Ot .!= U(6)) .* (Ot .== St) .* alpha[:, :, t] .* beta[:, :, t] ./ sumC[:, :, t]
     end
     mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)
 end
