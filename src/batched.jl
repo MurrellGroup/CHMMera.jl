@@ -1,12 +1,3 @@
-#=
-TODO
-
-- add forward!, backward!, viterbi
-- add support for ApproximateHMM
-- add unit tests
-
-=#
-
 # ==== Batched CHMMera.jl ==== #
 get_chimera_probabilities(device::Function, queries::Vector{String}, references::Vector{String}, batchsize::Integer=200; bw::Bool = true, mutation_probabilities::Vector{Float64} = [0.0047, 0.01, 0.05, 0.1, 0.15, 0.2], base_mutation_probability::Float64 = 0.05, prior_probability::Float64 = 0.02) =
     get_chimera_probabilities(device, as_ints.(queries), as_ints.(references), batchsize, bw, mutation_probabilities, base_mutation_probability, prior_probability)
