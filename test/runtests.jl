@@ -1,7 +1,9 @@
 using CHMMera
 using Test
+using Random: seed!
+seed!(1)
 
-
+include("naive_algorithms.jl")
 
 @testset "CHMMera.jl" begin
     @testset "utils.jl" begin
@@ -26,6 +28,27 @@ using Test
         @test approximatehmm.switch_probability == 0.01 / 6
         @test CHMMera.get_bs(approximatehmm, CHMMera.as_ints("ACGT-N"), [0.01, 0.02]) == [0.99 0.99 0.99 0.99 1.0 1.0;
                                                                                                 0.98 0.98 0.98 0.98 1.0 1.0]
+    end
+
+    @testset "algorithms.jl" begin
+        # Compare forward vs a naive implementation of forward
+        n_tests = 100
+        seq_length = 9
+        num_refs = 4
+        tests = []
+        for i in 1:n_tests
+            references = [join(rand(collect("ACGT"), seq_length)) for _ in 1:num_refs]
+            query = join(rand(collect("ACGT"), seq_length))
+            # Test O(N) vs O(N^2)
+            full_hmm = CHMMera.FullHMM(CHMMera.vovtomatrix(CHMMera.as_ints.(references)), [0.1, 0.2, 0.3], 1 / 300, 0.01)
+            full_hmm_bs = CHMMera.get_bs(full_hmm, CHMMera.as_ints(query), [0.1, 0.2, 0.3])
+            push!(tests, isapprox(CHMMera.forward(full_hmm, full_hmm_bs), naive_forward(full_hmm, full_hmm_bs), atol=1e-6))
+
+            approx_hmm = CHMMera.ApproximateHMM(CHMMera.vovtomatrix(CHMMera.as_ints.(references)), 1 / 300)
+            approx_hmm_bs = CHMMera.get_bs(approx_hmm, CHMMera.as_ints(query), fill(0.05, length(query)))
+            push!(tests, isapprox(CHMMera.forward(approx_hmm, approx_hmm_bs), naive_forward(approx_hmm, approx_hmm_bs), atol=1e-6))
+        end
+        @test all(tests)
     end
 
     @testset "CHMMera.jl" begin
@@ -78,5 +101,15 @@ using Test
         @test recombination_events[2].recombinations == [RecombinationEvent(4, 2, 1, 2, 1)]
         @test recombination_events[2].startingpoint == 2
         @test recombination_events[2].pathevaluation > 0.9
+
+
+        # Test O(N) vs O(N^2)
+        full_hmm = CHMMera.FullHMM(CHMMera.vovtomatrix(CHMMera.as_ints.(references)), [0.1, 0.2, 0.3], 1 / 300, 0.01)
+        full_hmm_bs = CHMMera.get_bs(full_hmm, CHMMera.as_ints(queries[2]), [0.1, 0.2, 0.3])
+        @test CHMMera.forward(full_hmm, full_hmm_bs) ≈ naive_forward(full_hmm, full_hmm_bs) atol=1e-5
+
+        approx_hmm = CHMMera.ApproximateHMM(CHMMera.vovtomatrix(CHMMera.as_ints.(references)), 1 / 300)
+        approx_hmm_bs = CHMMera.get_bs(approx_hmm, CHMMera.as_ints(queries[2]), fill(0.05, length(queries[2])))
+        @test CHMMera.forward(approx_hmm, approx_hmm_bs) ≈ naive_forward(approx_hmm, approx_hmm_bs) atol=1e-5
     end
 end
