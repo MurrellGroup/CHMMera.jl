@@ -5,6 +5,7 @@ export get_chimera_probabilities, get_recombination_events, RecombinationEvents,
 include("utils.jl")
 include("hmm.jl")
 include("algorithms.jl")
+include("batched.jl")
 
 
 """

@@ -29,22 +29,22 @@ Base.show(io::IO, recomb::RecombinationEvent) = print(io, "(position = $(recomb.
 
 function chimeraprobability(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
-    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
-    b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
+    hmm isa ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
+    b = hmm isa ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
     return forward(hmm, b)
 end
 
 function findrecombinations(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
-    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
-    b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
+    hmm isa ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
+    b = hmm isa ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
     return viterbi(hmm, b)
 end
 
 function findrecombinations_detailed(O::Vector{UInt8}, hmm::T, mutation_probabilities::Vector{Float64}) where T <: HMM
     b = get_bs(hmm, O, mutation_probabilities)
-    T == ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
-    b = T == ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
+    hmm isa ApproximateHMM && parameterestimation!(hmm, O, mutation_probabilities, b)
+    b = hmm isa ApproximateHMM ? get_bs(hmm, O, mutation_probabilities) : b
     recombs = viterbi(hmm, b)
     if length(recombs.recombinations) == 0
         return DetailedRecombinationEvents(recombs.recombinations, recombs.startingpoint, -Inf, [])
@@ -75,7 +75,7 @@ function findrecombinations_detailed(O::Vector{UInt8}, hmm::T, mutation_probabil
         # For the fullbayesian version, each reference has multiple states, hence why we use stateindicesofref
         # exp(logp_position[i, t]) should not underflow here, since we are iterating over the path with the highest (log)probability
         p_ref[cur] = max(sum( exp(logp_position[i, t]) for i in stateindicesofref(cur, hmm) ), p_ref[cur])
-        if recombindex <= length(recombs.recombinations) && t == recombs.recombinations[recombindex].position
+        if recombindex <= length(recombs.recombinations) && t + 1 == recombs.recombinations[recombindex].position
             cur = recombs.recombinations[recombindex].right
             recombindex += 1
         end
@@ -90,7 +90,7 @@ end
 function logsiteprobabilities(recombs::RecombinationEvents,
                             O::Vector{UInt8},
                             hmm::T,
-                            b::Matrix{Float64}) where T <: HMM
+                            b::Matrix{Float64}; sum_over_referencestates = false) where T <: HMM
     # length(recombs) > 0 || "No recombinations found, can only be run on chimeric sequences"
     if length(recombs.recombinations) == 0
         return zeros(Float64, length(O))
@@ -106,7 +106,12 @@ function logsiteprobabilities(recombs::RecombinationEvents,
     i = 1
     cur = recombs.recombinations[i].left_state
     for t in 1:hmm.L
-        log_probability[t] = log(alpha[cur, t]) + log(beta[cur, t]) - log(sum(alpha[:, t] .* beta[:, t]))
+        if sum_over_referencestates && hmm isa FullHMM
+            states = stateindicesofref(ref_index(cur, hmm), hmm)
+            log_probability[t] = log(sum(alpha[states, t] .* beta[states, t])) - log(sum(alpha[:, t] .* beta[:, t]))
+        else
+            log_probability[t] = log(alpha[cur, t]) + log(beta[cur, t]) - log(sum(alpha[:, t] .* beta[:, t]))
+        end
         if t < hmm.L && i <= length(recombs.recombinations) && recombs.recombinations[i].position == t
             cur = recombs.recombinations[i].right_state
             i += 1
@@ -147,7 +152,7 @@ function parameterestimation!(hmm::ApproximateHMM, O::Vector{UInt8}, mutation_pr
     mutation_probabilities .= Nmut ./ (Nmut .+ Nsame)
 end
 
-function forward(hmm::HMM, b::Matrix{Float64})
+function forward(hmm::ApproximateHMM, b::Matrix{Float64})
     alpha = Matrix{Float64}(undef, 2, hmm.N)
     a_false = a(false, hmm)
     a_true = a(true, hmm)
@@ -184,7 +189,7 @@ function forward(hmm::HMM, b::Matrix{Float64})
     return detec / (sum(view(alpha, 1, :)) + detec)
 end
 
-function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, hmm::HMM, b::Matrix{Float64})
+function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, hmm::ApproximateHMM, b::Matrix{Float64})
     a_false = a(false, hmm)
     a_true = a(true, hmm)
 
@@ -207,7 +212,7 @@ function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, hmm::HMM, b::Matri
     end
 end
 
-function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::HMM, b::Matrix{Float64})
+function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::ApproximateHMM, b::Matrix{Float64})
     a_false = a(false, hmm)
     a_true = a(true, hmm)
 
@@ -224,9 +229,10 @@ function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::HMM, b::Matri
     end
 end
 
-function viterbi(hmm::HMM, b::Matrix{Float64})
+function viterbi(hmm::ApproximateHMM, b::Matrix{Float64})
     log_b = log.(b)
     phi = Array{Float64}(undef, hmm.N)
+    phi_nxt = Array{Float64}(undef, hmm.N)
     from = Array{Int64}(undef, hmm.N, hmm.L)
     for i in 1:hmm.N
         phi[i] = log(initialstate(hmm) * b[i, 1])
@@ -240,16 +246,162 @@ function viterbi(hmm::HMM, b::Matrix{Float64})
         @simd for j in 1:hmm.N
             if phi[j] + log_a_true > phi[maxstate] + log_a_false || j == maxstate
                 from[j, t+1] = j
-                phi[j] = phi[j] + log_a_true + log_b[j, t+1]
+                phi_nxt[j] = phi[j] + log_a_true + log_b[j, t+1]
             else
                 from[j, t+1] = maxstate
-                phi[j] = phi[maxstate] + log_a_false + log_b[j, t+1]
+                phi_nxt[j] = phi[maxstate] + log_a_false + log_b[j, t+1]
             end
         end
+        copy!(phi, phi_nxt)
     end
     cur = argmax(phi)
     recombinations = Vector{RecombinationEvent}()
     @inbounds @simd for t in hmm.L:-1:1
+        if cur != from[cur, t]
+            if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
+                push!(recombinations, RecombinationEvent(t, ref_index(from[cur, t], hmm), ref_index(cur, hmm), from[cur, t], cur))
+            end
+            cur = from[cur, t]
+        end
+    end
+    sort!(recombinations, by = x -> x.position)
+    return RecombinationEvents(recombinations, ref_index(cur, hmm))
+end
+
+
+
+#----- FullHMM algorithms -----#
+function forward(hmm::FullHMM, b::Matrix{Float64})
+    alpha = Matrix{Float64}(undef, 2, hmm.N)
+    init_state = initialstate(hmm)
+
+    a_self = 1 - hmm.switch_probability - hmm.μ
+    a_diffref = hmm.switch_probability / ((hmm.n - 1) * hmm.K)
+    a_diffmut = hmm.K == 1 ? 0.0 : hmm.μ / (hmm.K - 1)
+
+    for i in 1:hmm.N
+        alpha[1, i] = init_state * b[i, 1]
+        alpha[2, i] = 0.0
+    end
+
+    for t in 1:hmm.L-1
+        sumalpha = 0.0
+        for i in 1:hmm.N
+            sumalpha += alpha[1, i] + alpha[2, i]
+        end
+
+        scaling_constant = 0.0
+        for ref in 1:hmm.n
+            states = stateindicesofref(ref, hmm)
+            sum_1_states = sum(alpha[1, states])
+            sum_2_states = sum(alpha[2, states])
+            for j in states
+                alpha[1, j] = (alpha[1, j] * a_self + (sum_1_states - alpha[1, j]) * a_diffmut) * b[j, t+1]
+                alpha[2, j] = (alpha[2, j] * a_self + (sum_2_states - alpha[2, j]) * a_diffmut + (sumalpha - sum_2_states - sum_1_states) * a_diffref) * b[j, t+1]
+
+                scaling_constant += alpha[1, j] + alpha[2, j]
+            end
+        end
+
+        scaling_constant = 1.0 / scaling_constant
+        for j in 1:hmm.N
+            alpha[1, j] *= scaling_constant
+            alpha[2, j] *= scaling_constant
+        end
+    end
+
+    detec = sum(view(alpha, 2, :))
+    return detec / (sum(view(alpha, 1, :)) + detec)
+end
+
+function forward!(alpha::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::Matrix{Float64})
+    a_self = 1 - hmm.switch_probability - hmm.μ
+    a_diffref = hmm.switch_probability / ((hmm.n - 1) * hmm.K)
+    a_diffmut = hmm.K == 1 ? 0.0 : hmm.μ / (hmm.K - 1)
+
+    c[1] = 1
+    for i in 1:hmm.N
+        alpha[i, 1] = initialstate(hmm) * b[i, 1]
+    end
+    for t in 1:hmm.L-1
+        sumalpha = sum(view(alpha, :, t))
+
+        for ref in 1:hmm.n
+            states = stateindicesofref(ref, hmm)
+            sumstates = sum(view(alpha, states, t))
+
+            for j in states
+                alpha[j, t + 1] = (alpha[j, t] * a_self + (sumstates - alpha[j, t]) * a_diffmut + (sumalpha - sumstates) * a_diffref) * b[j, t+1]
+            end
+        end
+
+        c[t+1] = 1 / sum(view(alpha, :, t+1))
+        alpha[:,t+1] .*= c[t+1]
+    end
+end
+
+function backward!(beta::Matrix{Float64}, c::Vector{Float64}, hmm::FullHMM, b::Matrix{Float64})
+    a_self = 1 - hmm.switch_probability - hmm.μ
+    a_diffref = hmm.switch_probability / ((hmm.n - 1) * hmm.K)
+    a_diffmut = hmm.K == 1 ? 0.0 : hmm.μ / (hmm.K - 1)
+
+    beta[:, hmm.L] .= c[hmm.L]
+    for t in hmm.L-1:-1:1
+        sumbeta = 0.0
+        for j in 1:hmm.N
+            sumbeta += beta[j, t+1] * b[j, t+1]
+        end
+
+        for ref in 1:hmm.n
+            states = stateindicesofref(ref, hmm)
+            sumstates = sum(beta[states, t+1] .* b[states, t+1])
+            for i in states
+                beta[i, t] = (a_self * beta[i, t+1] * b[i, t+1]) + (a_diffmut * (sumstates - beta[i, t+1] * b[i, t+1])) + (a_diffref * (sumbeta - sumstates))
+            end
+        end
+        beta[:, t] .*= c[t]
+    end
+end
+
+function viterbi(hmm::FullHMM, b::Matrix{Float64})
+
+    log_b = log.(b)
+    phi = Array{Float64}(undef, hmm.N)
+    phi_nxt = Array{Float64}(undef, hmm.N)
+    from = Array{Int64}(undef, hmm.N, hmm.L)
+    for i in 1:hmm.N
+        phi[i] = log(initialstate(hmm) * b[i, 1])
+        from[i, 1] = i
+    end
+
+    log_a_self = log(1 - hmm.switch_probability - hmm.μ)
+    log_a_diffref = log(hmm.switch_probability / ((hmm.n - 1) * hmm.K))
+    log_a_diffmut = hmm.K == 1 ? -Inf64 : log(hmm.μ / (hmm.K - 1))
+    for t in 1:hmm.L-1
+        phi_order = sortperm(phi)
+        for ref in 1:hmm.n
+            states = stateindicesofref(ref, hmm)
+            argmax_diffref = phi_order[findlast(!∈(states), phi_order)]
+            states_ordered = sort(states; by = i -> phi[i])
+            for j in states
+                if hmm.K == 1
+                    keys = (j, argmax_diffref)
+                    values = (phi[j] + log_a_self, phi[argmax_diffref] + log_a_diffref)
+                else
+                    argmax_diffmut = findlast(!=(j), states_ordered)
+                    keys = (j, argmax_diffref, argmax_diffmut)
+                    values = (phi[j] + log_a_self, phi[argmax_diffref] + log_a_diffref, phi[argmax_diffmut] + log_a_diffmut)
+                end
+                choice = argmax(values)
+                from[j, t+1] = keys[choice]
+                phi_nxt[j] = values[choice] + log_b[j, t+1]
+            end
+        end
+        copy!(phi, phi_nxt)
+    end
+    cur = argmax(phi)
+    recombinations = Vector{RecombinationEvent}()
+    for t in hmm.L:-1:1
         if cur != from[cur, t]
             if ref_index(cur, hmm) != ref_index(from[cur, t], hmm)
                 push!(recombinations, RecombinationEvent(t, ref_index(from[cur, t], hmm), ref_index(cur, hmm), from[cur, t], cur))
